@@ -6,7 +6,7 @@ import Taro from '@tarojs/taro'
  * 后端需实现 POST {baseURL}/polish，Body: { text: string }，响应: { text: string }。
  */
 export function polishText(text: string): Promise<string> {
-  const baseURL = process.env.AIBOOK_API_BASE || 'https://your-api.com/aibook'
+  const baseURL = 'http://192.168.3.5:3000'
   return new Promise((resolve, reject) => {
     Taro.request({
       url: `${baseURL}/polish`,
@@ -32,6 +32,6 @@ export function polishText(text: string): Promise<string> {
 
 /** 是否已配置真实后端（非占位 URL） */
 export function isPolishApiConfigured(): boolean {
-  const base = process.env.AIBOOK_API_BASE || 'https://your-api.com/aibook'
+  const base = 'http://192.168.3.5:3000'
   return !base.includes('your-api.com')
 }
