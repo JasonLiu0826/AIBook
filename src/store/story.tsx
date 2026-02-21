@@ -39,6 +39,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
   const [currentStoryTitle, setCurrentStoryTitleState] = useState('')
   const [state, setState] = useState<StoryState>(defaultStoryState)
   const hasLoadedRef = useRef(false)
+  const isSwitchingRef = useRef(false) // 🌟 新增：防覆盖锁
 
   const loadStoryList = useCallback(async () => {
     try {
@@ -59,6 +60,7 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       setState(defaultStoryState)
       return
     }
+    isSwitchingRef.current = true // 🌟 开启锁
     try {
       const raw = await Taro.getStorage({ key: STORAGE_STORY_PREFIX + currentStoryId })
       const data = raw?.data as Partial<StoryState> | undefined
@@ -73,6 +75,8 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       setState(defaultStoryState)
+    } finally {
+      setTimeout(() => { isSwitchingRef.current = false }, 100) // 🌟 解锁
     }
   }, [currentStoryId])
 
@@ -91,7 +95,8 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
   }, [loadStoryList])
 
   useEffect(() => {
-    if (!hasLoadedRef.current || !currentStoryId) return
+    // 🌟 判断条件加上 isSwitchingRef.current
+    if (!hasLoadedRef.current || !currentStoryId || isSwitchingRef.current) return
     saveCurrentStory()
   }, [state.chapters, state.branchPath, currentStoryId])
 
@@ -128,11 +133,16 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
 
   const switchStory = useCallback(
     async (id: string) => {
-      await saveCurrentStory()
+      isSwitchingRef.current = true // 🌟 开启防覆盖锁
+      if (currentStoryId) {
+         await saveCurrentStory() // 安全保存上一个故事
+      }
+      
       setCurrentStoryIdState(id)
       const meta = storyList.find((s) => s.id === id)
       setCurrentStoryTitleState(meta?.title || '')
-      setState(defaultStoryState)
+      setState(defaultStoryState) // 清空视图
+      
       try {
         const raw = await Taro.getStorage({ key: STORAGE_STORY_PREFIX + id })
         const data = raw?.data as Partial<StoryState> | undefined
@@ -145,9 +155,11 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
         }
       } catch {
         setState(defaultStoryState)
+      } finally {
+        setTimeout(() => { isSwitchingRef.current = false }, 100) // 🌟 载入完毕，解锁
       }
     },
-    [storyList, saveCurrentStory]
+    [storyList, saveCurrentStory, currentStoryId]
   )
 
   const setCurrentStoryTitle = useCallback(
@@ -176,9 +188,11 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     
     // 如果删除的是正在看的故事，则退回空白状态
     if (currentStoryId === id) {
+      isSwitchingRef.current = true // 🌟 删除清空时也要上锁
       setCurrentStoryIdState(null)
       setCurrentStoryTitleState('')
       resetStory()
+      setTimeout(() => { isSwitchingRef.current = false }, 100)
     }
   }, [currentStoryId, saveStoryList, resetStory])
 
