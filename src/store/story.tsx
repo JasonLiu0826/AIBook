@@ -26,6 +26,9 @@ type StoryContextValue = StoryState & {
   loadStoryList: () => Promise<void>
   loadCurrentStory: () => Promise<void>
   saveCurrentStory: () => Promise<void>
+  // 👇 新增：删除和重命名方法
+  deleteStory: (id: string) => Promise<void>
+  renameStory: (id: string, newTitle: string) => Promise<void>
 }
 
 const StoryContext = createContext<StoryContextValue | null>(null)
@@ -160,6 +163,37 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     [currentStoryId, saveStoryList]
   )
 
+  // 👇 新增的删除逻辑
+  const deleteStory = useCallback(async (id: string) => {
+    setStoryList((prev) => {
+      const next = prev.filter((s) => s.id !== id)
+      saveStoryList(next)
+      return next
+    })
+    try {
+      await Taro.removeStorage({ key: STORAGE_STORY_PREFIX + id })
+    } catch (e) {} // 忽略不存在时的报错
+    
+    // 如果删除的是正在看的故事，则退回空白状态
+    if (currentStoryId === id) {
+      setCurrentStoryIdState(null)
+      setCurrentStoryTitleState('')
+      resetStory()
+    }
+  }, [currentStoryId, saveStoryList, resetStory])
+
+  // 👇 新增的重命名逻辑
+  const renameStory = useCallback(async (id: string, newTitle: string) => {
+    setStoryList((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, title: newTitle } : s))
+      saveStoryList(next)
+      return next
+    })
+    if (currentStoryId === id) {
+      setCurrentStoryTitleState(newTitle)
+    }
+  }, [currentStoryId, saveStoryList])
+
   const value: StoryContextValue = {
     ...state,
     storyList,
@@ -173,7 +207,9 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     setCurrentStoryTitle,
     loadStoryList,
     loadCurrentStory,
-    saveCurrentStory
+    saveCurrentStory,
+    deleteStory,  // 暴露给外部使用
+    renameStory   // 暴露给外部使用
   }
 
   return (
