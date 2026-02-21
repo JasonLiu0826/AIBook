@@ -1,0 +1,41 @@
+{
+  "name": "aibook-react-typescript",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI 互动式小说生成器 - 小程序版优先，React + TypeScript",
+  "scripts": {
+    "build:weapp": "taro build --type weapp",
+    "build:h5": "taro build --type h5",
+    "dev:weapp": "npm run build:weapp -- --watch",
+    "dev:h5": "npm run build:h5 -- --watch",
+    "dev:server": "node server.js",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev:weapp\""
+  },
+  "dependencies": {
+    "@tarojs/components": "3.6.22",
+    "@tarojs/helper": "3.6.22",
+    "@tarojs/plugin-framework-react": "3.6.22",
+    "@tarojs/plugin-platform-weapp": "3.6.22",
+    "@tarojs/react": "3.6.22",
+    "@tarojs/runtime": "3.6.22",
+    "@tarojs/taro": "3.6.22",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@tarojs/cli": "3.6.22",
+    "@tarojs/webpack5-runner": "3.6.22",
+    "@types/react": "18.2.0",
+    "babel-preset-taro": "^3.6.22",
+    "typescript": "^5.0.0",
+    "webpack": "5.88.0"
+  },
+  "browserslist": [
+    "last 3 versions",
+    "Android >= 4.4",
+    "ios >= 9"
+  ]
+}
