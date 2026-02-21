@@ -179,10 +179,6 @@ app.get('/health', (req, res) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
-  console.log(`🚀 AIBook 真实后端已启动在 http://localhost:${PORT}`);
-  console.log(`📡 流式接口: http://localhost:${PORT}/generate/stream`);
-  console.log(`📝 普通接口: http://localhost:${PORT}/generate`);
-  console.log(`📝 润色接口: http://localhost:${PORT}/polish`);
-  console.log(`💚 健康检查: http://localhost:${PORT}/health`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 AIBook 真实后端已允许局域网访问，端口: ${PORT}`);
 });
