@@ -46,7 +46,8 @@ export async function generateChapter(params: GenerateParams): Promise<GenerateR
  */
 
 /** 后端 API 根地址。微信小程序请设为电脑局域网 IP，如 http://192.168.1.100:3000 */
-const getApiBase = (): string => 'http://192.168.3.5:3000'
+const getApiBase = (): string =>
+  (process.env.AIBOOK_API_BASE || 'https://your-api.com/aibook').replace(/\/$/, '')
 
 export async function generateChapterStream(
   params: GenerateParams, 

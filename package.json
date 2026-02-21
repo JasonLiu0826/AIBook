@@ -19,10 +19,12 @@
     "@tarojs/react": "3.6.22",
     "@tarojs/runtime": "3.6.22",
     "@tarojs/taro": "3.6.22",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
+    "axios": "^1.13.5",
+    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "openai": "^6.22.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.23.0",
@@ -30,7 +32,7 @@
     "@tarojs/webpack5-runner": "3.6.22",
     "@types/react": "18.2.0",
     "babel-preset-taro": "^3.6.22",
-    "concurrently": "^8.2.2", 
+    "concurrently": "^8.2.2",
     "typescript": "^5.0.0",
     "webpack": "5.88.0"
   },

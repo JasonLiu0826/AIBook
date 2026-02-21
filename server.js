@@ -1,83 +1,160 @@
 const express = require('express');
 const cors = require('cors');
+const { OpenAI } = require('openai');
+
 const app = express();
 const PORT = 3000;
 
-// 中间件
 app.use(cors());
 app.use(express.json());
 
-// 模拟 AI 生成接口 - 流式版本
-app.post('/generate/stream', (req, res) => {
-  console.log('收到流式生成请求:', req.body);
+// 真实的 AI 流式接口
+app.post('/generate/stream', async (req, res) => {
+  console.log('\n--- 收到真实流式生成请求 ---');
   
-  // 设置流式响应头
+  // 必须设置的 SSE 流式响应头
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive'
-    // 删除了 'Access-Control-Allow-Origin': '*'，由顶部的 app.use(cors()) 统一接管
   });
 
-  // 模拟流式数据发送
-  const mockData = [
-    { type: 'title', value: '第一章 神秘的邀请函' },
-    { type: 'content', value: '夜色如墨，雨丝斜织。林默站在老旧公寓的窗前，手中握着一封泛黄的信封。' },
-    { type: 'content', value: '信封上没有寄件人姓名，只有一行娟秀的小字："致命运的编织者"。' },
-    { type: 'content', value: '他轻轻拆开信封，一张羊皮纸滑落而出。纸张边缘已经磨损，上面用暗红色墨水写着一段话：' },
-    { type: 'content', value: '"当月光与影子重叠之时，古老的图书馆将向你敞开大门。那里藏着改变一切的秘密，但记住——选择即代价。"' },
-    { type: 'branches', value: JSON.stringify([
-      '跟随神秘人影的指引，前往对面大楼',
-      '仔细研究信件，寻找隐藏的线索',
-      '联系老朋友，询问关于父亲失踪的往事'
-    ]) }
-  ];
+  try {
+    // 1. 获取小程序传过来的所有设定和参数
+    const { settings, userConfig, contextSummary, chosenBranch, nextChapterIndex } = req.body;
+    
+    // 2. 提取前端传来的 API Key
+    const authHeader = req.headers.authorization;
+    const apiKey = authHeader ? authHeader.split(' ')[1] : null;
 
-  // 模拟逐步发送数据
-  let index = 0;
-  const sendNext = () => {
-    if (index < mockData.length) {
-      const data = mockData[index];
-      const sseData = `data: ${JSON.stringify(data)}\n\n`;
-      res.write(sseData);
-      index++;
-      
-      // 间隔发送，模拟真实流式效果
-      setTimeout(sendNext, index === 1 ? 1000 : 800);
-    } else {
-      // 发送完成信号
-      res.write(`data: {"type":"complete","value":"生成完成"}\n\n`);
-      res.end();
+    if (!apiKey) {
+      res.write(`data: ${JSON.stringify({ type: 'error', value: '未检测到 API Key，请返回小程序配置页填写' })}\n\n`);
+      return res.end();
     }
-  };
 
-  sendNext();
+    console.log(`准备生成第 ${nextChapterIndex} 章...`);
+
+    // 3. 组装给 AI 的提示词 (Prompt Engineering) 
+    let prompt = `你是一个互动小说家。请为我写第 ${nextChapterIndex} 章的正文。\n\n`;
+    
+    prompt += `【世界观设定】：${settings.worldview || '无'}\n`;
+    prompt += `【人物设定】：${settings.characters || '无'}\n`;
+    if (contextSummary) prompt += `【前情提要】：\n${contextSummary}\n`;
+    if (chosenBranch) prompt += `【本章走向】：主角在上一章结尾选择了——"${chosenBranch}"，请顺着这个选择往下写。\n`;
+    
+    const povMap = { 'first': '第一人称(我)', 'second': '第二人称(你)', 'third': '第三人称(他/她)' };
+    const pov = povMap[userConfig?.pov] || '第三人称';
+
+    // 强制 AI 按规定格式输出（特别是分支选项）
+    prompt += `\n【重要要求】：
+1. 请直接输出小说正文，严禁输出任何多余的客套话或分析解释。
+2. 视角必须使用 ${pov}。字数控制在 ${userConfig?.singleOutputLength || 800} 字左右。
+3. 在正文最后，你必须为主角设计3个不同的行动选项作为下一章的分支。请严格以 "选项A：XXX|选项B：XXX|选项C：XXX" 的单行格式放在整篇文末，不要带换行，方便程序提取。`;
+
+    // 4. 初始化 DeepSeek 客户端 (通过更换 baseURL 连入国内 DeepSeek)
+    const openai = new OpenAI({
+      baseURL: 'https://api.deepseek.com', // 指向 DeepSeek 官方 API
+      apiKey: apiKey,
+    });
+
+    // 5. 先给前端发送一个生成的标题（让前端立马有响应）
+    res.write(`data: ${JSON.stringify({ type: 'title', value: `第 ${nextChapterIndex} 章` })}\n\n`);
+
+    // 6. 开启真实的 AI 流式请求
+    const stream = await openai.chat.completions.create({
+      model: 'deepseek-chat', 
+      messages: [{ role: 'user', content: prompt }],
+      stream: true, 
+    });
+
+    let fullContent = '';
+
+    // 7. 遍历流，实时把文字转给小程序
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        fullContent += content;
+        res.write(`data: ${JSON.stringify({ type: 'content', value: content })}\n\n`);
+      }
+    }
+
+    // 8. 文本生成完了，用正则从全文末尾提取出那 3 个选项分支
+    let branches = ["继续探索", "停下休息", "仔细观察四周"]; // 兜底的默认分支
+    const branchMatch = fullContent.match(/选项A：(.*?)\|选项B：(.*?)\|选项C：(.*)/);
+    if (branchMatch) {
+      branches = [branchMatch[1].trim(), branchMatch[2].trim(), branchMatch[3].trim()];
+    } else {
+      // 容错匹配：如果 AI 不听话换行了
+      const fallbackMatch = fullContent.match(/选项[A|1][：|:](.*?)\n.*选项[B|2][：|:](.*?)\n.*选项[C|3][：|:](.*)/s);
+      if(fallbackMatch) branches = [fallbackMatch[1].trim(), fallbackMatch[2].trim(), fallbackMatch[3].trim()];
+    }
+
+    // 发送提取出来的分支数据给前端渲染按钮
+    res.write(`data: ${JSON.stringify({ type: 'branches', value: JSON.stringify(branches) })}\n\n`);
+    
+    // 9. 完美收工，断开连接
+    res.write(`data: ${JSON.stringify({ type: 'complete', value: '生成完成' })}\n\n`);
+    res.end();
+    console.log('--- 章节生成完毕 ---');
+
+  } catch (error) {
+    console.error('AI请求报错:', error.message);
+    res.write(`data: ${JSON.stringify({ type: 'error', value: `AI 接口请求失败：${error.message}` })}\n\n`);
+    res.end();
+  }
 });
 
-// 普通生成接口（非流式）
-app.post('/generate', (req, res) => {
+// 普通生成接口（非流式）- 保持兼容性
+app.post('/generate', async (req, res) => {
   console.log('收到普通生成请求:', req.body);
   
-  // 模拟 AI 生成结果
-  setTimeout(() => {
-    res.json({
-      title: '第一章 神秘的邀请函',
-      content: `夜色如墨，雨丝斜织。林默站在老旧公寓的窗前，手中握着一封泛黄的信封。信封上没有寄件人姓名，只有一行娟秀的小字："致命运的编织者"。
+  try {
+    const { settings, userConfig, contextSummary, chosenBranch, nextChapterIndex } = req.body;
+    const authHeader = req.headers.authorization;
+    const apiKey = authHeader ? authHeader.split(' ')[1] : null;
 
-他轻轻拆开信封，一张羊皮纸滑落而出。纸张边缘已经磨损，上面用暗红色墨水写着一段话：
+    if (!apiKey) {
+      return res.status(401).json({ error: '未检测到 API Key' });
+    }
 
-"当月光与影子重叠之时，古老的图书馆将向你敞开大门。那里藏着改变一切的秘密，但记住——选择即代价。"
+    // 构建提示词
+    let prompt = `你是一个互动小说家。请为我写第 ${nextChapterIndex} 章的正文。\n\n`;
+    prompt += `【世界观设定】：${settings.worldview || '无'}\n`;
+    prompt += `【人物设定】：${settings.characters || '无'}\n`;
+    if (contextSummary) prompt += `【前情提要】：\n${contextSummary}\n`;
+    if (chosenBranch) prompt += `【本章走向】：主角选择了"${chosenBranch}"\n`;
+    
+    const povMap = { 'first': '第一人称(我)', 'second': '第二人称(你)', 'third': '第三人称(他/她)' };
+    const pov = povMap[userConfig?.pov] || '第三人称';
 
-林默的心跳突然加快。这封信，和三年前父亲失踪前留下的最后一句话一模一样。
+    prompt += `\n【要求】：直接输出小说正文，使用${pov}，约${userConfig?.singleOutputLength || 800}字，并在文末提供3个选项分支。`;
 
-窗外，一道闪电划破夜空，照亮了对面大楼玻璃幕墙上的倒影——那里，似乎有一个模糊的人影正注视着他。`,
-      branches: [
-        '跟随神秘人影的指引，前往对面大楼',
-        '仔细研究信件，寻找隐藏的线索',
-        '联系老朋友，询问关于父亲失踪的往事'
-      ]
+    const openai = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: apiKey,
     });
-  }, 2000);
+
+    const completion = await openai.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [{ role: 'user', content: prompt }],
+      stream: false,
+    });
+
+    const content = completion.choices[0]?.message?.content || '';
+    
+    // 简单提取分支（这里可以进一步优化）
+    const branches = ["继续探索", "停下休息", "仔细观察四周"];
+    
+    res.json({
+      title: `第 ${nextChapterIndex} 章`,
+      content: content,
+      branches: branches
+    });
+
+  } catch (error) {
+    console.error('AI请求报错:', error.message);
+    res.status(500).json({ error: `AI 接口请求失败：${error.message}` });
+  }
 });
 
 // 润色接口
@@ -103,9 +180,8 @@ app.get('/health', (req, res) => {
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log(`🚀 AIBook 后端服务已启动`);
-  console.log(`📡 监听端口: ${PORT}`);
-  console.log(`📝 流式接口: http://localhost:${PORT}/generate/stream`);
+  console.log(`🚀 AIBook 真实后端已启动在 http://localhost:${PORT}`);
+  console.log(`📡 流式接口: http://localhost:${PORT}/generate/stream`);
   console.log(`📝 普通接口: http://localhost:${PORT}/generate`);
   console.log(`📝 润色接口: http://localhost:${PORT}/polish`);
   console.log(`💚 健康检查: http://localhost:${PORT}/health`);
