@@ -45,8 +45,8 @@ export async function generateChapter(params: GenerateParams): Promise<GenerateR
  * 后端需支持分块传输（chunked transfer encoding）
  */
 
-/** 后端 API 根地址。本地开发环境使用 127.0.0.1 */
-const getApiBase = (): string => 'http://127.0.0.1:3000'
+/** 后端 API 根地址。本地开发环境使用 192.168.3.5 */
+const getApiBase = (): string => 'http://192.168.3.5:3000'
 
 export async function generateChapterStream(
   params: GenerateParams, 
