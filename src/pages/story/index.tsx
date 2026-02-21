@@ -55,6 +55,9 @@ export default function StoryPage() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [wordCount, setWordCount] = useState(0)
   const [autoScroll, setAutoScroll] = useState(true)
+  
+  // 🌟【修复点1】增加一个专门用于展示打字机过程的临时状态
+  const [typingChapter, setTypingChapter] = useState<Partial<Chapter> | null>(null)
 
   const apiConfigured = isGenerateApiConfigured(config.aiProvider, config.apiKey)
   const lastChapter = useMemo(() => chapters[chapters.length - 1], [chapters])
@@ -94,24 +97,21 @@ export default function StoryPage() {
     setShowSuccess(false)
     setGenerating(true)
     let loadingShown = false
-    let errorToast: { title: string; icon: 'success' | 'loading' | 'none'; duration: number } | null = null
+    let errorToast: { title: string; icon: 'none' | 'success', duration: number } | null = null
     
     try {
-      // 显示加载提示
-      Taro.showLoading({ title: '正在编织精彩故事...' })
+      Taro.showLoading({ title: '正在构思剧情...', mask: true })
       loadingShown = true
       
-      // 检查必要配置
       if (!settings.characters || settings.characters.trim().length === 0) {
         throw new Error('请先在后台设定中完善人物设定')
       }
       
-      if (!settings.worldview || settings.worldview.trim().length === 0) {
-        throw new Error('请先在后台设定中完善世界观设定')
-      }
-      
       await saveSettings()
-      // 使用流式生成
+      
+      // 🌟【修复点2】初始化打字机状态
+      setTypingChapter({ index: chapters.length + 1, title: '', content: '' })
+      
       let partialTitle = '';
       let partialContent = '';
       let partialBranches: string[] = [];
@@ -125,33 +125,41 @@ export default function StoryPage() {
           nextChapterIndex: chapters.length + 1
         },
         (partialData) => {
+          // 🌟【修复点3】当收到任何真实内容时，立刻关掉挡路的 Loading，让用户欣赏打字过程！
+          if (loadingShown && (partialData.type === 'title' || partialData.type === 'content')) {
+            Taro.hideLoading()
+            loadingShown = false
+          }
+
           switch (partialData.type) {
             case 'title':
               partialTitle = partialData.value;
-              // 实时更新标题显示
+              setTypingChapter(prev => prev ? { ...prev, title: partialTitle } : null)
               break;
             case 'content':
               partialContent += partialData.value;
-              // 实时更新内容显示（打字机效果）
+              setTypingChapter(prev => prev ? { ...prev, content: partialContent } : null)
+              
+              // 自动滚动到底部
+              setTimeout(() => {
+                if (typeof document !== 'undefined') {
+                  const scrollView = document.querySelector('.scroll')
+                  if (scrollView) scrollView.scrollTop = scrollView.scrollHeight
+                }
+              }, 50)
               break;
             case 'branches':
               try {
                 partialBranches = JSON.parse(partialData.value);
-              } catch (e) {
-                console.error('解析分支数据失败:', e);
-              }
-              break;
-            case 'complete':
-              // 生成完成
-              break;
-            case 'error':
-              setError(partialData.value || '生成意外中断');
+              } catch (e) {}
               break;
           }
         }
       )
       
-      // 验证返回结果
+      // 生成结束，清空临时打字机状态，并把完整章节加入主仓库
+      setTypingChapter(null)
+      
       if (!result.title || !result.content) {
         throw new Error('AI返回的内容格式异常，请重试')
       }
@@ -161,66 +169,23 @@ export default function StoryPage() {
         index: chapters.length + 1,
         title: result.title,
         content: result.content,
-        branches: result.branches.map((text, i) => ({
-          id: `b_${i}`,
-          text,
-          isCustom: false
-        })) as BranchOption[],
+        branches: result.branches.map((text, i) => ({ id: `b_${i}`, text, isCustom: false })) as BranchOption[],
         createdAt: Date.now()
       }
       
       addChapter(chapter)
       setShowSuccess(true)
       
-      // 平滑滚动到底部显示新章节
-      setTimeout(() => {
-        // 注意：小程序环境中可能没有document对象
-        // 这里保留原生方法供H5使用，小程序使用Taro的API
-        if (typeof document !== 'undefined') {
-          const scrollView = document.querySelector('.scroll')
-          if (scrollView) {
-            scrollView.scrollTop = scrollView.scrollHeight
-          }
-        }
-      }, 300)
-      
-      // 成功提示
-      Taro.showToast({ 
-        title: `第${chapter.index}章创作完成！`, 
-        icon: 'success',
-        duration: 2000
-      })
-      
     } catch (e) {
       const msg = e instanceof Error ? e.message : '生成失败，请稍后重试'
       setError(msg)
-      console.error('生成失败:', e)
+      setTypingChapter(null) // 出错也要清空状态
       
-      // 先记录要展示的 toast，在 finally 里 hideLoading 之后再展示，保证 showLoading/hideLoading 配对
-      let toastTitle = msg
-      let toastDuration = 3000
-      if (msg.includes('网络') || msg.includes('连接') || msg.includes('fetch')) {
-        toastTitle = '网络连接失败，请检查后端是否启动及 AIBOOK_API_BASE 是否为本机局域网 IP'
-      } else if (msg.includes('配置')) {
-        toastTitle = msg
-        toastDuration = 4000
-      } else if (msg.includes('超时')) {
-        toastTitle = '请求超时，请稍后再试'
-      }
-      errorToast = { title: toastTitle, icon: 'none', duration: toastDuration }
+      errorToast = { title: msg.includes('网络') ? '网络连接失败' : msg, icon: 'none', duration: 3000 }
     } finally {
       setGenerating(false)
-      // 必须先 hideLoading 再 showToast，否则小程序会报 showLoading/hideLoading 未配对
-      if (loadingShown) {
-        Taro.hideLoading()
-      }
-      if (errorToast) {
-        Taro.showToast({
-          title: errorToast.title,
-          icon: errorToast.icon,
-          duration: errorToast.duration
-        })
-      }
+      if (loadingShown) Taro.hideLoading()
+      if (errorToast) Taro.showToast(errorToast)
     }
   }
 
@@ -368,6 +333,19 @@ export default function StoryPage() {
             </View>
           )
         })}
+        
+        {/* 🌟【修复点4】在这里渲染打字机实时预览章节 */}
+        {typingChapter && (
+          <View className="chapter generating-preview">
+            <Text className="chapter-index">第 {typingChapter.index} 章</Text>
+            <Text className="chapter-title">{typingChapter.title || '系统正在酝酿标题...'}</Text>
+            <Text className="chapter-content">
+              {typingChapter.content}
+              {/* 加入一个闪烁的光标增加氛围感 */}
+              <Text className="cursor">|</Text>
+            </Text>
+          </View>
+        )}
         
         {/* 自定义分支输入 */}
         {lastChapter && lastChapter.branches.length > 0 && (

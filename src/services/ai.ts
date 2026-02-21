@@ -66,6 +66,11 @@ export async function generateChapterStream(
       return
     }
 
+    // 🌟【修复点1】在这里内部收集最终结果，等待请求结束时统一返回
+    let finalTitle = ''
+    let finalContent = ''
+    let finalBranches: [string, string, string] = ['', '', '']
+
     try {
       const requestTask = Taro.request({
         url: `${baseURL}/generate/stream`,
@@ -77,15 +82,13 @@ export async function generateChapterStream(
         },
         enableChunked: true, 
         timeout: 60000, 
-        success: (res) => {
-          try {
-            const data = res.data as GenerateResult
-            if (data.title && data.content && Array.isArray(data.branches)) {
-              resolve(data)
-            }
-          } catch (e) {
-            // 如果不是完整结果，等待流数据处理结束
-          }
+        success: () => {
+          // 🌟【修复点2】网络连接正常结束时，直接 resolve 我们在 onChunkReceived 中拼装好的数据
+          resolve({
+            title: finalTitle,
+            content: finalContent,
+            branches: finalBranches
+          })
         },
         fail: (err) => {
           reject(new Error(`请求失败: ${err.errMsg}`))
@@ -124,6 +127,20 @@ export async function generateChapterStream(
               
               try {
                 const parsed = JSON.parse(jsonStr)
+                // 🌟【修复点3】在此处拼装最终结果
+                if (parsed.type === 'title') finalTitle = parsed.value
+                if (parsed.type === 'content') finalContent += parsed.value
+                if (parsed.type === 'branches') {
+                  try { 
+                    const branchesArray = JSON.parse(parsed.value);
+                    // 确保数组长度为3，不足的用空字符串填充
+                    finalBranches = [
+                      branchesArray[0] || '',
+                      branchesArray[1] || '',
+                      branchesArray[2] || ''
+                    ] as [string, string, string];
+                  } catch (e) {}
+                }
                 onUpdate(parsed)
               } catch (e) {
                 console.error('单条流数据JSON解析失败:', jsonStr, e)
