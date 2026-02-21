@@ -1,5 +1,52 @@
 import Taro from '@tarojs/taro'
-import type { GenerateParams, GenerateResult } from '@/types'
+import type { GenerateParams, GenerateResult, Chapter } from '@/types'
+
+// 👇 把这段代码粘贴在这里，这是一个所有手机都兼容的万能解码器
+class Utf8Decoder {
+  private buffer: number[] = [];
+
+  public decode(bytes: Uint8Array): string {
+    let i = 0;
+    let str = "";
+    const allBytes = new Uint8Array(this.buffer.length + bytes.length);
+    allBytes.set(this.buffer);
+    allBytes.set(bytes, this.buffer.length);
+    this.buffer = [];
+    
+    while (i < allBytes.length) {
+      const c = allBytes[i];
+      let bytesNeeded = 0;
+      
+      if (c <= 0x7F) bytesNeeded = 1;
+      else if ((c & 0xE0) === 0xC0) bytesNeeded = 2;
+      else if ((c & 0xF0) === 0xE0) bytesNeeded = 3;
+      else if ((c & 0xF8) === 0xF0) bytesNeeded = 4;
+      else { i++; continue; } 
+      
+      if (i + bytesNeeded > allBytes.length) {
+        for (let j = i; j < allBytes.length; j++) {
+          this.buffer.push(allBytes[j]);
+        }
+        break;
+      }
+      
+      if (bytesNeeded === 1) {
+        str += String.fromCharCode(c);
+      } else if (bytesNeeded === 2) {
+        str += String.fromCharCode(((c & 0x1F) << 6) | (allBytes[i + 1] & 0x3F));
+      } else if (bytesNeeded === 3) {
+        str += String.fromCharCode(((c & 0x0F) << 12) | ((allBytes[i + 1] & 0x3F) << 6) | (allBytes[i + 2] & 0x3F));
+      } else if (bytesNeeded === 4) {
+        const codePoint = ((c & 0x07) << 18) | ((allBytes[i + 1] & 0x3F) << 12) | ((allBytes[i + 2] & 0x3F) << 6) | (allBytes[i + 3] & 0x3F);
+        const u = codePoint - 0x10000;
+        str += String.fromCharCode(0xD800 | (u >> 10));
+        str += String.fromCharCode(0xDC00 | (u & 0x3FF));
+      }
+      i += bytesNeeded;
+    }
+    return str;
+  }
+}
 
 /**
  * AI 生成接口 - 普通版本（返回完整结果）
@@ -97,14 +144,13 @@ export async function generateChapterStream(
       // 👇 核心修复区开始 👇
       let streamBuffer = '' // 【修复】在回调外部声明缓冲区，防止多次触发时清空之前的数据
       
-      // 【修复】使用 TextDecoder 处理 UTF-8，彻底解决中文乱码 (需微信基础库支持)
-      // 如果小程序报错找不到 TextDecoder，可使用 TextDecoder polyfill
-      const decoder = new TextDecoder('utf-8')
+      // ✅ 换成这行新代码（使用我们手写的类）：
+      const decoder = new Utf8Decoder()
 
       requestTask.onChunkReceived((res) => {
         try {
-          // 1. 解码新到达的数据块，并拼接到缓冲区末尾
-          const chunkText = decoder.decode(new Uint8Array(res.data), { stream: true })
+          // ✅ 换成这行新代码：
+          const chunkText = decoder.decode(new Uint8Array(res.data))
           streamBuffer += chunkText
           
           // 2. 按 SSE 协议的事件分隔符 \n\n 拆分数据包
