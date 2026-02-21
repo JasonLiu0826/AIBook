@@ -1,40 +1,26 @@
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Dependencies
+node_modules/
+.npm/
 
-# testing
-/coverage
+# Build outputs
+dist/
+build/
 
-# production
-/build
-/dist
-
-# misc
-.DS_Store
+# Environment variables
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# taro
-/.temp
-/dist
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-Thumbs.db
-
 # Logs
 logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # Runtime data
 pids
@@ -46,11 +32,11 @@ pids
 lib-cov
 
 # Coverage directory used by tools like istanbul
-coverage
+coverage/
 *.lcov
 
 # nyc test coverage
-.nyc_output
+.nyc_output/
 
 # Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
@@ -62,14 +48,13 @@ bower_components
 .lock-wscript
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
-build/Release
+build/Release/
 
 # Dependency directories
-node_modules/
 jspm_packages/
 
-# TypeScript v1 declaration files
-typings/
+# Snowpack dependency directory (https://snowpack.dev/)
+web_modules/
 
 # TypeScript cache
 *.tsbuildinfo
@@ -95,27 +80,35 @@ typings/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
-.env
+# dotenv environment variable files
 .env.test
 
 # parcel-bundler cache (https://parceljs.org/)
-.cache
+.cache/
 .parcel-cache
 
 # Next.js build output
-.next
+.next/
 
 # Nuxt.js build / generate output
-.nuxt
-dist
+.nuxt/
+dist/
 
 # Gatsby files
 .cache/
-public
+# Comment in the public line in if your project uses Gatsby and not Next.js
+# https://nextjs.org/blog/next-9-1#public-directory-support
+# public/
 
 # vuepress build output
-.vuepress/dist
+.vuepress/dist/
+
+# vuepress v2.x temp and cache directory
+.temp/
+.cache/
+
+# Docusaurus cache and generated files
+.docusaurus/
 
 # Serverless directories
 .serverless/
@@ -126,19 +119,29 @@ public
 # DynamoDB Local files
 .dynamodb/
 
-# TernJS port file
-.tern-port
+# Taro build directory
+dist/
 
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
+# VS Code
+.vscode/
 
-# yarn v2
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
+# macOS
+.DS_Store
 
-# Taro project specific
-.project
-node_modules
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+tmp/
+temp/
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# Local config files
+project.private.config.json

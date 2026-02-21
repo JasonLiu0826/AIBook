@@ -15,8 +15,8 @@ app.post('/generate/stream', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*'
+    'Connection': 'keep-alive'
+    // 删除了 'Access-Control-Allow-Origin': '*'，由顶部的 app.use(cors()) 统一接管
   });
 
   // 模拟流式数据发送

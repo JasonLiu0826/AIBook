@@ -58,27 +58,15 @@ export async function generateChapterStream(
   return new Promise((resolve, reject) => {
     // 检查是否配置了真实后端（未配置时使用 mock）
     if (baseURL.includes('your-api.com')) {
-      // 使用mock数据（模拟流式效果）
-      setTimeout(() => {
-        onUpdate({ type: 'title', value: '第一章 神秘的邀请函' })
-      }, 500)
-      setTimeout(() => {
-        onUpdate({ type: 'content', value: '夜色如墨，雨丝斜织。林默站在老旧公寓的窗前，手中握着一封泛黄的信封。' })
-      }, 1500)
-      setTimeout(() => {
-        onUpdate({ type: 'content', value: '信封上没有寄件人姓名，只有一行娟秀的小字："致命运的编织者"。' })
-      }, 2500)
-      setTimeout(() => {
-        onUpdate({ type: 'branches', value: JSON.stringify(['跟随神秘人影的指引', '仔细研究信件', '联系老朋友']) })
-      }, 3500)
-      setTimeout(() => {
-        resolve(getMockFirstChapter())
-      }, 4500)
+      setTimeout(() => onUpdate({ type: 'title', value: '第一章 神秘的邀请函' }), 500)
+      setTimeout(() => onUpdate({ type: 'content', value: '夜色如墨，雨丝斜织。林默站在老旧公寓的窗前，手中握着一封泛黄的信封。' }), 1500)
+      setTimeout(() => onUpdate({ type: 'content', value: '信封上没有寄件人姓名，只有一行娟秀的小字："致命运的编织者"。' }), 2500)
+      setTimeout(() => onUpdate({ type: 'branches', value: JSON.stringify(['跟随神秘人影的指引', '仔细研究信件', '联系老朋友']) }), 3500)
+      setTimeout(() => resolve(getMockFirstChapter()), 4500)
       return
     }
 
     try {
-      // 发起支持 chunked 的请求
       const requestTask = Taro.request({
         url: `${baseURL}/generate/stream`,
         method: 'POST',
@@ -87,18 +75,16 @@ export async function generateChapterStream(
           'Content-Type': 'application/json',
           ...(params.userConfig.apiKey ? { 'Authorization': `Bearer ${params.userConfig.apiKey}` } : {})
         },
-        enableChunked: true, // 核心：开启流式接收
-        timeout: 60000, // 60秒最大限制
+        enableChunked: true, 
+        timeout: 60000, 
         success: (res) => {
-          // 请求成功，可能已经收到完整数据或部分数据
-          // 如果后端在最后返回完整结果，这里可以处理
           try {
             const data = res.data as GenerateResult
             if (data.title && data.content && Array.isArray(data.branches)) {
               resolve(data)
             }
           } catch (e) {
-            // 如果不是完整结果，继续等待流数据
+            // 如果不是完整结果，等待流数据处理结束
           }
         },
         fail: (err) => {
@@ -106,33 +92,49 @@ export async function generateChapterStream(
         }
       })
 
-      // 监听流式数据块的到达
+      // 👇 核心修复区开始 👇
+      let streamBuffer = '' // 【修复】在回调外部声明缓冲区，防止多次触发时清空之前的数据
+      
+      // 【修复】使用 TextDecoder 处理 UTF-8，彻底解决中文乱码 (需微信基础库支持)
+      // 如果小程序报错找不到 TextDecoder，可使用 TextDecoder polyfill
+      const decoder = new TextDecoder('utf-8')
+
       requestTask.onChunkReceived((res) => {
         try {
-          // 将 ArrayBuffer 转为字符串
-          const arrayBuffer = res.data
-          const uint8Array = new Uint8Array(arrayBuffer)
-          let text = ''
-          for (let i = 0; i < uint8Array.length; i++) {
-            text += String.fromCharCode(uint8Array[i])
-          }
+          // 1. 解码新到达的数据块，并拼接到缓冲区末尾
+          const chunkText = decoder.decode(new Uint8Array(res.data), { stream: true })
+          streamBuffer += chunkText
           
-          // 解析流数据（假设后端返回格式：data: {"type":"content","value":"..."}\n\n）
-          if (text.includes('data:')) {
-            const jsonDataMatch = text.match(/data:\s*({.*})\s*\n\n/)
-            if (jsonDataMatch && jsonDataMatch[1]) {
+          // 2. 按 SSE 协议的事件分隔符 \n\n 拆分数据包
+          const parts = streamBuffer.split('\n\n')
+          
+          // 3. 最后一个元素可能是未接收完整的半个包，弹出并保留在缓冲区中等待下次拼接
+          streamBuffer = parts.pop() || ''
+          
+          // 4. 遍历处理所有完整的包
+          for (const part of parts) {
+            const trimmedPart = part.trim()
+            if (!trimmedPart) continue
+            
+            // 确保是 data: 开头的数据
+            if (trimmedPart.startsWith('data:')) {
+              const jsonStr = trimmedPart.replace(/^data:\s*/, '').trim()
+              
+              if (jsonStr === '[DONE]') continue // 忽略某些AI接口规范的结束符
+              
               try {
-                const parsed = JSON.parse(jsonDataMatch[1])
+                const parsed = JSON.parse(jsonStr)
                 onUpdate(parsed)
               } catch (e) {
-                console.error('解析流数据JSON失败:', e)
+                console.error('单条流数据JSON解析失败:', jsonStr, e)
               }
             }
           }
         } catch (error) {
-          console.error('处理流数据失败:', error)
+          console.error('处理流数据块失败:', error)
         }
       })
+      // 👆 核心修复区结束 👆
 
     } catch (error) {
       reject(error)

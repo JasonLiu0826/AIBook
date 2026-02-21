@@ -30,6 +30,7 @@
     "@tarojs/webpack5-runner": "3.6.22",
     "@types/react": "18.2.0",
     "babel-preset-taro": "^3.6.22",
+    "concurrently": "^8.2.2", 
     "typescript": "^5.0.0",
     "webpack": "5.88.0"
   },
