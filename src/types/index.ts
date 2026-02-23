@@ -28,6 +28,8 @@ export interface UserConfigState {
   apiKey?: string
   /** 自定义API地址 */
   customApiUrl?: string
+  /** 触觉震动反馈开关 */
+  enableVibration?: boolean
   /** 其他可扩展：如温度、模型等 */
   [key: string]: unknown
 }

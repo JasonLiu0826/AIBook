@@ -1,4 +1,4 @@
-import { View, Text, Input, Picker } from '@tarojs/components'
+import { View, Text, Input, Picker, Switch } from '@tarojs/components' // 👈 这里补上了 Switch
 import { useUserConfig } from '@/store/userConfig'
 import type { NarrativePOV } from '@/types'
 import './index.scss'
@@ -10,7 +10,8 @@ const POV_OPTIONS: { value: NarrativePOV; label: string }[] = [
 ]
 
 export default function ConfigPage() {
-  const { config, setSingleOutputLength, setPOV, save } = useUserConfig()
+  // 🌟 1. 在顶部的解构中，加入你刚刚写的 setEnableVibration
+  const { config, setSingleOutputLength, setPOV, save, setEnableVibration } = useUserConfig()
 
   const onLengthChange = (e: { detail: { value: string } }) => {
     const n = parseInt(e.detail.value, 10)
@@ -26,6 +27,13 @@ export default function ConfigPage() {
       setPOV(POV_OPTIONS[idx].value)
       save()
     }
+  }
+
+  // 🌟 2. 彻底替换掉原来的 onVibrationChange 函数
+  const onVibrationChange = (e: { detail: { value: boolean } }) => {
+    // 使用标准的 set 方法更新状态，告别直接赋值
+    setEnableVibration(e.detail.value)
+    save()
   }
 
   return (
@@ -55,6 +63,19 @@ export default function ConfigPage() {
           </View>
         </Picker>
         <Text className="hint">第一/二人称代入感更强，第三人称更像传统小说</Text>
+      </View>
+
+      {/* 👇 震动反馈开关模块 */}
+      <View className="section">
+        <View style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <Text className="label" style={{ marginBottom: 0 }}>📳 触觉震动反馈</Text>
+          <Switch 
+            checked={config.enableVibration !== false} 
+            color="#4a7c59"
+            onChange={onVibrationChange} 
+          />
+        </View>
+        <Text className="hint" style={{ marginTop: '16rpx', display: 'block' }}>开启后，点击按钮和AI打字时会有细腻的物理震动体验</Text>
       </View>
     </View>
   )
