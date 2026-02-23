@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { View, Text, Button, Input, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useSettings } from '@/store/settings'
@@ -7,6 +7,63 @@ import { useStory } from '@/store/story'
 import { generateChapterStream, isGenerateApiConfigured, getMockFirstChapter, summarizeChapterNode } from '@/services/ai'
 import type { Chapter, BranchOption } from '@/types'
 import './index.scss'
+
+/**
+ * 🚀 生产级 Taro 聊天滚动 Hook
+ * 适用于：
+ * - AI token 流式
+ * - 聊天 UI
+ * - 小说生成 UI
+ */
+export function useChatScroll(isGenerating: boolean) {
+  // ScrollView 控制值
+  const [scrollTop, setScrollTop] = useState(0)
+
+  // 用户是否正在上滑查看历史
+  const userLockedRef = useRef(false)
+
+  // 防抖 timer（避免安卓卡顿）
+  const timerRef = useRef<any>(null)
+
+  // ===== 1️⃣ 强制滚到底部（按钮 / 发送消息）=====
+  const forceScrollToBottom = useCallback(() => {
+    userLockedRef.current = false
+    // 强行赋予极大的像素值，如果已经是 99999 就给个 99998 制造状态变更强制重渲
+    setScrollTop(prev => prev >= 99999 ? 99998 : 99999) 
+  }, [])
+
+  // ===== 2️⃣ 智能流式滚动（AI token）=====
+  const smartAutoScroll = useCallback(() => {
+    if (userLockedRef.current) return
+
+    if (timerRef.current) clearTimeout(timerRef.current)
+
+    timerRef.current = setTimeout(() => {
+      // 同样的核武器逻辑
+      setScrollTop(prev => prev >= 99999 ? prev + 1 : 99999) 
+    }, 60)
+  }, [])
+
+  // ===== 3️⃣ 用户滚动监听（核心）=====
+  const onScroll = useCallback(
+    (e: any) => {
+      const deltaY = e?.detail?.deltaY ?? 0
+
+      // 向上滚 → 用户查看历史 → 上锁
+      if (deltaY < -2) userLockedRef.current = true
+      // 向下滚 → 接近底部 → 解锁
+      if (deltaY > 2) userLockedRef.current = false
+    },
+    []
+  )
+
+  return {
+    scrollTop,
+    forceScrollToBottom,
+    smartAutoScroll,
+    onScroll,
+  }
+}
 
 function genId() {
   return `ch_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
@@ -52,46 +109,27 @@ export default function StoryPage() {
     updateLastChapterChoice
   } = useStory()
   
-  const [scrollToId, setScrollToId] = useState('') // 用于直达底部
   const [customBranch, setCustomBranch] = useState('')
   const [error, setError] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const [wordCount, setWordCount] = useState(0)
   const [autoScroll, setAutoScroll] = useState(true)
   const [showMenu, setShowMenu] = useState(false)
-  
+    
   const [typingChapter, setTypingChapter] = useState<Partial<Chapter> | null>(null)
   
-  // ✅ 替换为这行：使用 scrollTop 强制控制滚动高度
-  const [scrollTop, setScrollTop] = useState(0)
-
-  // 🌟 核心绝招：强行把高度设为 99999。
-  // 如果当前已经是 99999，就设为 99998 制造微小差异，逼迫小程序重新执行到底部的滚动动画！
-  const handleScrollToBottom = () => {
-    setScrollTop(prev => prev === 99999 ? 99998 : 99999)
-  }
+  // 🌟 引入我们的终极 Hook
+  const { 
+    scrollTop, 
+    forceScrollToBottom, 
+    smartAutoScroll, 
+    onScroll
+  } = useChatScroll(generating);
   
-  // 添加直达底部的方法
-  const scrollToBottom = () => {
-    // Taro 的 scrollIntoView 需要状态发生变化才会触发滚动。
-    // 所以我们先置空，在下一个事件循环中赋上锚点 ID，强制触发滚动动画。
-    setScrollToId('')
-    setTimeout(() => {
-      setScrollToId('bottom-anchor')
-    }, 50)
-  }
-
-  // 🌟 自动滚动逻辑：监听章节变化或打字机状态，自动拉取到底部
+  // 🌟 AI 打字或章节增加时，触发智能滚动
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (generating && typingChapter) {
-        handleScrollToBottom()
-      } else if (chapters && chapters.length > 0) {
-        handleScrollToBottom()
-      }
-    }, 100) // 延迟100ms确保新内容渲染完毕
-    return () => clearTimeout(timer)
-  }, [chapters?.length, generating, typingChapter?.index])
+    if (typingChapter) smartAutoScroll()
+  }, [typingChapter])
 
   const apiConfigured = isGenerateApiConfigured(config.aiProvider, config.apiKey)
   const lastChapter = useMemo(() => chapters?.[chapters.length - 1], [chapters])
@@ -128,6 +166,7 @@ export default function StoryPage() {
   }, [loadStoryList])
 
   const doGenerate = async (chosenBranch?: string) => {
+    forceScrollToBottom(); // 👈 用户只要做了选择/发消息，立刻强制切回底部
     if (chosenBranch && chapters?.length) {
       updateLastChapterChoice(chosenBranch) // 立即把选项变成右侧聊天气泡
     }
@@ -176,12 +215,7 @@ export default function StoryPage() {
               partialContent += partialData.value;
               setTypingChapter(prev => prev ? { ...prev, content: partialContent } : null)
               
-              setTimeout(() => {
-                if (typeof document !== 'undefined') {
-                  const scrollView = document.querySelector('.scroll')
-                  if (scrollView) scrollView.scrollTop = scrollView.scrollHeight
-                }
-              }, 50)
+              smartAutoScroll()   // ⭐⭐⭐ 关键
               break;
             case 'branches':
               try {
@@ -315,12 +349,13 @@ export default function StoryPage() {
 
   return (
     <View className="page-story">
-      {/* 增加 scrollIntoView 绑定 */}
+
       <ScrollView 
         scrollY 
         className="scroll" 
-        scrollWithAnimation
-        scrollIntoView={scrollToId}
+        scrollTop={scrollTop}
+        scrollWithAnimation={!generating}
+        onScroll={onScroll}
       >
         {!apiConfigured && (!chapters || chapters.length === 0) && (
           <View className="api-tip">
@@ -387,79 +422,6 @@ export default function StoryPage() {
           </View>
         )}
         
-    {/* 重构底部区域：带汉堡菜单的上浮式功能栏 */}
-    <View className="footer-container">
-      {/* 第一行：输入框 + 发送 + 菜单按钮 */}
-      <View className="custom-input-row">
-        {/* 只有在需要用户做决定时，才展示输入框和发送按钮 */}
-        {lastChapter && lastChapter?.branches?.length > 0 && !lastChapter.selectedBranch && !generating ? (
-          <>
-            <Input
-              className="custom-input"
-              placeholder="自定义下一步剧情..."
-              value={customBranch}
-              onInput={(e) => setCustomBranch(e.detail.value)}
-              maxlength={100}
-            />
-            <Button 
-              className="btn-send" 
-              disabled={!customBranch.trim()} 
-              onClick={onCustomBranch}
-            >
-              发送
-            </Button>
-          </>
-        ) : (
-          /* 如果不需要输入框，用一个空 View 占满左边，把菜单按钮挤到最右边 */
-          <View className="flex-spacer" style={{ flex: 1 }}></View>
-        )}
-
-        {/* 右侧的汉堡菜单按钮（现代版） */}
-        <View className={`btn-menu-modern ${showMenu ? 'active' : ''}`} onClick={() => setShowMenu(!showMenu)}>
-          <View className="menu-bar bar-top"></View>
-          <View className="menu-bar bar-middle"></View>
-          <View className="menu-bar bar-bottom"></View>
-        </View>
-      </View>
-
-      {/* 第二行：隐藏的底部四项导航栏（通过 showMenu 控制上浮显示） */}
-      <View className={`footer-actions-panel ${showMenu ? 'show' : ''}`}>
-        {chapters?.length > 0 && (
-          <>
-            <Button className="action-btn" size="mini" onClick={() => { scrollToBottom(); setShowMenu(false); }}>
-              ⬇️ 直达底部
-            </Button>
-            <Button className="action-btn" size="mini" onClick={() => { handleExport(); setShowMenu(false); }}>
-              📤 导出
-            </Button>
-            <Button 
-              className="action-btn" 
-              size="mini" 
-              onClick={() => {
-                setShowMenu(false);
-                Taro.showModal({
-                  title: '重新开始',
-                  content: '确定要清空当前故事并重新开始吗？此操作不可恢复。',
-                  confirmColor: '#d9534f',
-                  success: (res) => {
-                    if (res.confirm) {
-                      resetStory()
-                      Taro.showToast({ title: '已清空故事', icon: 'success' })
-                    }
-                  }
-                })
-              }}
-            >
-              🔄 重启
-            </Button>
-          </>
-        )}
-        <Button className="action-btn primary" size="mini" onClick={() => Taro.redirectTo({ url: '/pages/story-list/index' })}>
-          📚 故事列表
-        </Button>
-      </View>
-    </View>
-        
         {showSuccess && (
           <View className="success-message">
             <Text>🎉 章节生成完成！</Text>
@@ -468,9 +430,81 @@ export default function StoryPage() {
               
         {error && <Text className="err">{error}</Text>}
         
-        {/* 确保这行代码在 </ScrollView> 闭合标签的紧挨着上方 */}
-        <View id="bottom-anchor" style={{ height: '2rpx', width: '100%' }}></View>
       </ScrollView>
+
+      {/* 重构底部区域：带汉堡菜单的上浮式功能栏 */}
+      <View className="footer-container">
+        {/* 第一行：输入框 + 发送 + 菜单按钮 */}
+        <View className="custom-input-row">
+          {/* 只有在需要用户做决定时，才展示输入框和发送按钮 */}
+          {lastChapter && lastChapter?.branches?.length > 0 && !lastChapter.selectedBranch && !generating ? (
+            <>
+              <Input
+                className="custom-input"
+                placeholder="自定义下一步剧情..."
+                value={customBranch}
+                onInput={(e) => setCustomBranch(e.detail.value)}
+                maxlength={100}
+              />
+              <Button 
+                className="btn-send" 
+                disabled={!customBranch.trim()} 
+                onClick={onCustomBranch}
+              >
+                发送
+              </Button>
+            </>
+          ) : (
+            /* 如果不需要输入框，用一个空 View 占满左边，把菜单按钮挤到最右边 */
+            <View className="flex-spacer" style={{ flex: 1 }}></View>
+          )}
+
+          {/* 右侧的汉堡菜单按钮（现代版） */}
+          <View className={`btn-menu-modern ${showMenu ? 'active' : ''}`} onClick={() => setShowMenu(!showMenu)}>
+            <View className="menu-bar bar-top"></View>
+            <View className="menu-bar bar-middle"></View>
+            <View className="menu-bar bar-bottom"></View>
+          </View>
+        </View>
+
+        {/* 第二行：隐藏的底部四项导航栏（通过 showMenu 控制上浮显示） */}
+        <View className={`footer-actions-panel ${showMenu ? 'show' : ''}`}>
+          {chapters?.length > 0 && (
+            <>
+              <Button className="action-btn" size="mini" onClick={() => { forceScrollToBottom(); setShowMenu(false); }}>
+                ⬇️ 直达底部
+              </Button>
+              <Button className="action-btn" size="mini" onClick={() => { handleExport(); setShowMenu(false); }}>
+                📤 导出
+              </Button>
+              <Button 
+                className="action-btn" 
+                size="mini" 
+                onClick={() => {
+                  setShowMenu(false);
+                  Taro.showModal({
+                    title: '重新开始',
+                    content: '确定要清空当前故事并重新开始吗？此操作不可恢复。',
+                    confirmColor: '#d9534f',
+                    success: (res) => {
+                      if (res.confirm) {
+                        resetStory()
+                        Taro.showToast({ title: '已清空故事', icon: 'success' })
+                      }
+                    }
+                  })
+                }}
+              >
+                🔄 重启
+              </Button>
+            </>
+          )}
+          <Button className="action-btn primary" size="mini" onClick={() => Taro.redirectTo({ url: '/pages/story-list/index' })}>
+            📚 故事列表
+          </Button>
+        </View>
+      </View>
+
     </View>
   )
 }

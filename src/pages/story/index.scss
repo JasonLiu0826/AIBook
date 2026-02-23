@@ -1,5 +1,6 @@
 .page-story {
-  min-height: 100vh;
+  height: 100vh;       /* 🌟 1. 改为绝对固定高度，不能是 min-height */
+  overflow: hidden;    /* 🌟 2. 彻底锁死整个页面的原生滑动 */
   display: flex;
   -ms-flex-direction: column;
   flex-direction: column;
@@ -22,7 +23,8 @@
 .scroll {
   -ms-flex: 1;
   flex: 1;
-  padding: 24rpx 32rpx 240rpx; /* 修复 scroll 的 padding-bottom，避免被变高后的 footer 遮挡 */
+  height: 1px;         /* 🌟 3. 这是小程序 Flex 布局的绝招：给 ScrollView 一个极小的基础高度，强制它根据 flex: 1 重新计算并在内部溢出 */
+  padding: 24rpx 32rpx 160rpx; /* 顺手帮你把之前重复的 padding-bottom 整合了 */
   
   &::-webkit-scrollbar {
     width: 0;
