@@ -167,11 +167,6 @@ export async function generateChapterStream(
                     ] as [string, string, string];
                   } catch (e) {}
                 }
-                // ✅ 处理node_update类型的解析
-                if (parsed.type === 'node_update' && parsed.value) {
-                    // 触发更新回调，让 UI 层感知到有了新的"锚点"
-                    onUpdate({ type: 'node_update', value: parsed.value });
-                }
                 onUpdate(parsed)
               } catch (e) {
                 console.error('单条流数据JSON解析失败:', jsonStr, e)
@@ -192,17 +187,6 @@ export async function generateChapterStream(
 export function isGenerateApiConfigured(aiProvider: string, apiKey?: string): boolean {
   const hasApiKey = aiProvider !== 'mock' && aiProvider !== 'custom' && !!apiKey?.trim()
   return hasApiKey || aiProvider === 'custom'
-}
-
-// ✅ 增加润色函数
-export async function polishSetting(text: string, type: 'worldview' | 'character', apiKey: string): Promise<string> {
-  const response = await Taro.request({
-    url: `${getApiBase()}/polish`,
-    method: 'POST',
-    data: { text, type, apiKey }
-  });
-  if (response.statusCode !== 200) throw new Error(response.data.error || '润色失败');
-  return response.data.text;
 }
 
 export function getMockFirstChapter(): GenerateResult {

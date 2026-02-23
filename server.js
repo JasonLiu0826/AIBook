@@ -42,11 +42,6 @@ app.post('/generate/stream', async (req, res) => {
     if (contextSummary) prompt += `【前情提要】：\n${contextSummary}\n`;
     if (chosenBranch) prompt += `【本章走向】：主角在上一章结尾选择了——"${chosenBranch}"，请顺着这个选择往下写。\n`;
     
-    // ✅ 加入重要故事锚点（核心记忆）
-    if (settings.storyNodes) {
-        prompt += `\n【重要故事锚点（核心记忆）】：\n${settings.storyNodes}\n（请务必确保新章节不与上述核心事实冲突）`;
-    }
-    
     const povMap = { 'first': '第一人称(我)', 'second': '第二人称(你)', 'third': '第三人称(他/她)' };
     const pov = povMap[userConfig?.pov] || '第三人称';
 
@@ -54,8 +49,7 @@ app.post('/generate/stream', async (req, res) => {
     prompt += `\n【重要要求】：
 1. 请直接输出小说正文，严禁输出任何多余的客套话或分析解释。
 2. 视角必须使用 ${pov}。字数控制在 ${userConfig?.singleOutputLength || 800} 字左右。
-3. 在正文最后，你必须为主角设计3个不同的行动选项作为下一章的分支。请严格以 "选项A：XXX|选项B：XXX|选项C：XXX" 的单行格式放在整篇文末，不要带换行，方便程序提取。
-4. 🌟最后一行请以 "SUMMARY：XXX" 的格式，用一句话（30字以内）总结本章发生的"不可逆转"的关键变动。摘要要极简，仅记录核心事实。`;
+3. 在正文最后，你必须为主角设计3个不同的行动选项作为下一章的分支。请严格以 "选项A：XXX|选项B：XXX|选项C：XXX" 的单行格式放在整篇文末，不要带换行，方便程序提取。`;
 
     // 4. 初始化 DeepSeek 客户端 (通过更换 baseURL 连入国内 DeepSeek)
     const openai = new OpenAI({
@@ -95,20 +89,8 @@ app.post('/generate/stream', async (req, res) => {
       if(fallbackMatch) branches = [fallbackMatch[1].trim(), fallbackMatch[2].trim(), fallbackMatch[3].trim()];
     }
 
-    // ✅ 提取剧情摘要(SUMMARY)
-    let nodeUpdate = "";
-    const summaryMatch = fullContent.match(/SUMMARY：(.*)$/m);
-    if (summaryMatch) {
-        nodeUpdate = summaryMatch[1].trim();
-        // 过滤掉正文中的摘要标记，不显示给用户看
-        fullContent = fullContent.replace(/SUMMARY：.*$/, "").trim();
-    }
-
     // 发送提取出来的分支数据给前端渲染按钮
     res.write(`data: ${JSON.stringify({ type: 'branches', value: JSON.stringify(branches) })}\n\n`);
-    
-    // ✅ 发送剧情锚点更新给前端
-    res.write(`data: ${JSON.stringify({ type: 'node_update', value: nodeUpdate })}\n\n`);
     
     // 9. 完美收工，断开连接
     res.write(`data: ${JSON.stringify({ type: 'complete', value: '生成完成' })}\n\n`);
@@ -175,28 +157,20 @@ app.post('/generate', async (req, res) => {
   }
 });
 
-// ✅ 真正的AI润色接口
-app.post('/polish', async (req, res) => {
-  const { text, type, apiKey } = req.body; // type 可以是 'worldview' 或 'character'
-  if (!text || !apiKey) return res.status(400).json({ error: '缺少内容或 API Key' });
-
-  try {
-    const openai = new OpenAI({ baseURL: 'https://api.deepseek.com', apiKey });
-    const response = await openai.chat.completions.create({
-      model: 'deepseek-chat',
-      messages: [
-        { 
-          role: 'system', 
-          content: `你是一个资深网文编辑。请对用户提供的${type === 'character' ? '角色设定' : '世界观设定'}进行润色和扩充。
-          要求：保持原有核心设定不变，语言要更有感染力，逻辑更严密，字数扩充到300字左右。直接输出结果，不要解释。` 
-        },
-        { role: 'user', content: text }
-      ]
-    });
-    res.json({ text: response.choices[0].message.content });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+// 润色接口
+app.post('/polish', (req, res) => {
+  console.log('收到润色请求:', req.body);
+  
+  const { text } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: '缺少文本内容' });
   }
+
+  // 简单的文本润色模拟
+  setTimeout(() => {
+    const polishedText = text.replace(/([。！？])/g, '$1 ').trim();
+    res.json({ text: polishedText });
+  }, 1000);
 });
 
 // 健康检查接口
