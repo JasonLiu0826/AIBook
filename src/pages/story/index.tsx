@@ -16,53 +16,30 @@ import './index.scss'
  * - 小说生成 UI
  */
 export function useChatScroll(isGenerating: boolean) {
-  // ScrollView 控制值
   const [scrollTop, setScrollTop] = useState(0)
-
-  // 用户是否正在上滑查看历史
   const userLockedRef = useRef(false)
-
-  // 防抖 timer（避免安卓卡顿）
   const timerRef = useRef<any>(null)
 
-  // ===== 1️⃣ 强制滚到底部（按钮 / 发送消息）=====
   const forceScrollToBottom = useCallback(() => {
     userLockedRef.current = false
-    // 强行赋予极大的像素值，如果已经是 99999 就给个 99998 制造状态变更强制重渲
     setScrollTop(prev => prev >= 99999 ? 99998 : 99999) 
   }, [])
 
-  // ===== 2️⃣ 智能流式滚动（AI token）=====
   const smartAutoScroll = useCallback(() => {
     if (userLockedRef.current) return
-
     if (timerRef.current) clearTimeout(timerRef.current)
-
     timerRef.current = setTimeout(() => {
-      // 同样的核武器逻辑
       setScrollTop(prev => prev >= 99999 ? prev + 1 : 99999) 
     }, 60)
   }, [])
 
-  // ===== 3️⃣ 用户滚动监听（核心）=====
-  const onScroll = useCallback(
-    (e: any) => {
-      const deltaY = e?.detail?.deltaY ?? 0
+  const onScroll = useCallback((e: any) => {
+    const deltaY = e?.detail?.deltaY ?? 0
+    if (deltaY < -2) userLockedRef.current = true
+    if (deltaY > 2) userLockedRef.current = false
+  }, [])
 
-      // 向上滚 → 用户查看历史 → 上锁
-      if (deltaY < -2) userLockedRef.current = true
-      // 向下滚 → 接近底部 → 解锁
-      if (deltaY > 2) userLockedRef.current = false
-    },
-    []
-  )
-
-  return {
-    scrollTop,
-    forceScrollToBottom,
-    smartAutoScroll,
-    onScroll,
-  }
+  return { scrollTop, forceScrollToBottom, smartAutoScroll, onScroll }
 }
 
 function genId() {
@@ -71,14 +48,7 @@ function genId() {
 
 function exportChaptersToText(chapters: Chapter[]): string {
   const timestamp = new Date().toLocaleString('zh-CN')
-  const header = `📖 AI互动小说导出
-
-导出时间: ${timestamp}
-总章节数: ${chapters?.length || 0}章
-
-${'='.repeat(50)}
-
-`
+  const header = `📖 AI互动小说导出\n\n导出时间: ${timestamp}\n总章节数: ${chapters?.length || 0}章\n\n${'='.repeat(50)}\n\n`
   
   const content = (chapters || [])
     .map((ch, index) => {
@@ -87,12 +57,25 @@ ${'='.repeat(50)}
     })
     .join('\n')
   
-  const footer = `
-
-${'='.repeat(50)}
-
-📝 本故事由AIBook智能创作助手生成`  
+  const footer = `\n\n${'='.repeat(50)}\n\n📝 本故事由AIBook智能创作助手生成`  
   return header + content + footer
+}
+
+// ===== 新增: Markdown 格式化导出 =====
+function exportChaptersToMarkdown(chapters: Chapter[]): string {
+  const timestamp = new Date().toLocaleString('zh-CN')
+  let md = `# 📖 AI互动小说导出\n\n> 导出时间: ${timestamp}\n> 总章节数: ${chapters?.length || 0}章\n\n---\n\n`;
+  
+  (chapters || []).forEach((ch, index) => {
+    md += `## 第 ${ch?.index || index + 1} 章 ${ch?.title || ''}\n\n${ch?.content || ''}\n\n`;
+    // 如果有用户选择的分支，也一并导出
+    if (ch.selectedBranch) {
+      md += `*👤 用户选择：${ch.selectedBranch}*\n\n`;
+    }
+  });
+  
+  md += `---\n\n*📝 本故事由AIBook智能创作助手生成*`;
+  return md;
 }
 
 export default function StoryPage() {
@@ -112,13 +95,13 @@ export default function StoryPage() {
   const [customBranch, setCustomBranch] = useState('')
   const [error, setError] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
-  const [wordCount, setWordCount] = useState(0)
-  const [autoScroll, setAutoScroll] = useState(true)
   const [showMenu, setShowMenu] = useState(false)
+  
+  // 🌟 控制自定义 ActionSheet 的显示状态
+  const [showExportSheet, setShowExportSheet] = useState(false)
     
   const [typingChapter, setTypingChapter] = useState<Partial<Chapter> | null>(null)
   
-  // 🌟 引入我们的终极 Hook
   const { 
     scrollTop, 
     forceScrollToBottom, 
@@ -126,15 +109,13 @@ export default function StoryPage() {
     onScroll
   } = useChatScroll(generating);
   
-  // 🌟 AI 打字或章节增加时，触发智能滚动
   useEffect(() => {
     if (typingChapter) smartAutoScroll()
-  }, [typingChapter])
+  }, [typingChapter, smartAutoScroll])
 
   const apiConfigured = isGenerateApiConfigured(config.aiProvider, config.apiKey)
   const lastChapter = useMemo(() => chapters?.[chapters.length - 1], [chapters])
   
-  // 🌟 修复点 1：摘要加防崩溃保护
   const contextSummary = useMemo(() => {
     if (!chapters || chapters.length === 0) return undefined
     const lastFew = chapters
@@ -143,32 +124,15 @@ export default function StoryPage() {
       .join('\n')
     return lastFew
   }, [chapters])
-  
-  // 🌟 修复点 2：字数统计加防崩溃保护
-  const totalWordCount = useMemo(() => {
-    return chapters?.reduce((total, chapter) => total + (chapter?.content?.length || 0), 0) || 0
-  }, [chapters])
-  
-  const branchSuggestions = useMemo(() => {
-    if (lastChapter?.branches?.length) {
-      return lastChapter.branches.slice(0, 2).map(b => typeof b === 'string' ? b : b?.text)
-    }
-    return [
-      '主角面临重大抉择',
-      '意外事件改变局势',
-      '新的角色登场',
-      '隐藏的秘密被揭露'
-    ]
-  }, [lastChapter])
 
   useEffect(() => {
     loadStoryList()
   }, [loadStoryList])
 
   const doGenerate = async (chosenBranch?: string) => {
-    forceScrollToBottom(); // 👈 用户只要做了选择/发消息，立刻强制切回底部
+    forceScrollToBottom();
     if (chosenBranch && chapters?.length) {
-      updateLastChapterChoice(chosenBranch) // 立即把选项变成右侧聊天气泡
+      updateLastChapterChoice(chosenBranch) 
     }
     setError('')
     setShowSuccess(false)
@@ -214,8 +178,7 @@ export default function StoryPage() {
             case 'content':
               partialContent += partialData.value;
               setTypingChapter(prev => prev ? { ...prev, content: partialContent } : null)
-              
-              smartAutoScroll()   // ⭐⭐⭐ 关键
+              smartAutoScroll()
               break;
             case 'branches':
               try {
@@ -244,35 +207,23 @@ export default function StoryPage() {
       addChapter(chapter)
       setShowSuccess(true)
       
-      // 🌟【新增】智能化记录关键剧情节点
       if (config.apiKey) {
-        console.log('正在自动记录重要剧情节点...');
         summarizeChapterNode(chapter.title, chapter.content, config.apiKey)
           .then(summary => {
             if (summary && summary.trim()) {
               const currentNodes = settings.storyNodes || '';
               const newNodeEntry = `- 第${chapter.index}章：${summary}`;
               const updatedNodes = currentNodes + (currentNodes ? '\n' : '') + newNodeEntry;
-              
-              // 自动写入"重要故事节点更新"模块
               settings.storyNodes = updatedNodes;
               saveSettings();
-              console.log('剧情节点记录成功:', newNodeEntry);
-            } else {
-              console.log('本章无重要节点更新');
             }
-          })
-          .catch(err => {
-            console.error('剧情总结失败:', err);
-            // 静默失败，不影响主流程
-          });
+          }).catch(err => { console.error('剧情总结失败:', err); });
       }
       
     } catch (e) {
       const msg = e instanceof Error ? e.message : '生成失败，请稍后重试'
       setError(msg)
       setTypingChapter(null) 
-      
       errorToast = { title: msg.includes('网络') ? '网络连接失败' : msg, icon: 'none', duration: 3000 }
     } finally {
       setGenerating(false)
@@ -302,31 +253,75 @@ export default function StoryPage() {
     onSelectBranch(t)
   }
 
-  const handleExport = async () => {
-    if (!chapters || chapters.length === 0) {
-      Taro.showToast({ title: '暂无内容可导出', icon: 'none' })
-      return
-    }
-    
-    let loadingShown = false
+  // ==================== 导出功能核心逻辑 ====================
+  
+  // 1. 复制纯文本
+  const handleCopyText = async () => {
+    if (!chapters || chapters.length === 0) return
+    Taro.showLoading({ title: '正在提取文字...' })
     try {
-      Taro.showLoading({ title: '正在导出...' })
-      loadingShown = true
       const text = exportChaptersToText(chapters)
-      
       await Taro.setClipboardData({ data: text })
-      
-      Taro.showToast({ 
-        title: `已导出${chapters.length}章内容到剪贴板`, 
-        icon: 'success',
-        duration: 2500
-      })
-    } catch (error) {
-      console.error('导出失败:', error)
-      Taro.showToast({ title: '导出失败，请重试', icon: 'none' })
+      setShowExportSheet(false)
+      Taro.showToast({ title: '已复制到剪贴板', icon: 'success' })
+    } catch (e) {
+      Taro.showToast({ title: '复制失败', icon: 'none' })
     } finally {
-      if (loadingShown) Taro.hideLoading()
+      Taro.hideLoading()
     }
+  }
+
+  // 2. 导出为本地文件 (TXT/Markdown) 并调用微信分享
+  const exportAsFile = async (type: 'txt' | 'md') => {
+    if (!chapters || chapters.length === 0) return
+    Taro.showLoading({ title: `正在生成${type.toUpperCase()}...` })
+    
+    try {
+      const content = type === 'md' ? exportChaptersToMarkdown(chapters) : exportChaptersToText(chapters)
+      const fs = Taro.getFileSystemManager()
+      const title = lastChapter?.title ? lastChapter.title.slice(0, 10) : '互动小说'
+      const fileName = `${title}_导出.${type}`
+      const filePath = `${Taro.env.USER_DATA_PATH}/${fileName}`
+      
+      fs.writeFileSync(filePath, content, 'utf8')
+      Taro.hideLoading()
+      setShowExportSheet(false)
+      
+      if (Taro.getEnv() === Taro.ENV_TYPE.WEAPP) {
+        // 使用 (Taro as any) 绕过类型检查，Taro 底层会完美代理原生的 wx.shareFileMessage
+        (Taro as any).shareFileMessage({
+          filePath: filePath,
+          fileName: fileName,
+          success: () => console.log('文件分享成功'),
+          fail: (err: any) => {  // 👈 这里加上 : any 解决隐式报错
+            console.error('分享失败', err)
+            Taro.showToast({ title: '已取消分享', icon: 'none' })
+          }
+        })
+      } else {
+        Taro.showToast({ title: '当前环境不支持文件分享', icon: 'none' })
+      }
+    } catch (error) {
+      console.error('导出文件失败:', error)
+      Taro.hideLoading()
+      Taro.showToast({ title: '生成文件失败', icon: 'error' })
+    }
+  }
+
+  // 3. 生成长图
+  const handleExportImage = () => {
+    setShowExportSheet(false)
+    Taro.showLoading({ title: '绘制中...' })
+    // TODO: 预留给 wxml-to-canvas 渲染
+    setTimeout(() => {
+      Taro.hideLoading()
+      Taro.showToast({ title: '长图模块准备中，敬请期待', icon: 'none', duration: 2500 })
+    }, 1000)
+  }
+
+  // 4. App专属不可用提示
+  const handleDisabledAppExport = () => {
+    Taro.showToast({ title: '仅供App功能开放', icon: 'error', duration: 2000 })
   }
 
   if (!currentStoryId) {
@@ -376,7 +371,6 @@ export default function StoryPage() {
           </View>
         )}
         
-        {/* 核心修改：遍历章节，支持selectedBranch气泡显示 */}
         {chapters?.map((ch, i) => {
           const isLast = i === chapters.length - 1
           return (
@@ -385,13 +379,11 @@ export default function StoryPage() {
               <Text className="chapter-title">{ch?.title}</Text>
               <Text className="chapter-content">{ch?.content}</Text>
               
-              {/* 核心修改：如果有 selectedBranch，说明用户选过了，展示为气泡 */}
               {ch.selectedBranch ? (
                 <View className="user-message-bubble">
                   <Text>{ch.selectedBranch}</Text>
                 </View>
               ) : (
-                // 没选过且是最后一章，展示原来的三个分支按钮
                 isLast && ch?.branches?.length > 0 && !generating && (
                   <View className="branches">
                     <Text className="branches-label">选择下一步剧情发展：</Text>
@@ -429,14 +421,11 @@ export default function StoryPage() {
         )}
               
         {error && <Text className="err">{error}</Text>}
-        
       </ScrollView>
 
-      {/* 重构底部区域：带汉堡菜单的上浮式功能栏 */}
+      {/* 底部导航栏与汉堡菜单 */}
       <View className="footer-container">
-        {/* 第一行：输入框 + 发送 + 菜单按钮 */}
         <View className="custom-input-row">
-          {/* 只有在需要用户做决定时，才展示输入框和发送按钮 */}
           {lastChapter && lastChapter?.branches?.length > 0 && !lastChapter.selectedBranch && !generating ? (
             <>
               <Input
@@ -455,11 +444,9 @@ export default function StoryPage() {
               </Button>
             </>
           ) : (
-            /* 如果不需要输入框，用一个空 View 占满左边，把菜单按钮挤到最右边 */
             <View className="flex-spacer" style={{ flex: 1 }}></View>
           )}
 
-          {/* 右侧的汉堡菜单按钮（现代版） */}
           <View className={`btn-menu-modern ${showMenu ? 'active' : ''}`} onClick={() => setShowMenu(!showMenu)}>
             <View className="menu-bar bar-top"></View>
             <View className="menu-bar bar-middle"></View>
@@ -467,14 +454,13 @@ export default function StoryPage() {
           </View>
         </View>
 
-        {/* 第二行：隐藏的底部四项导航栏（通过 showMenu 控制上浮显示） */}
         <View className={`footer-actions-panel ${showMenu ? 'show' : ''}`}>
           {chapters?.length > 0 && (
             <>
               <Button className="action-btn" size="mini" onClick={() => { forceScrollToBottom(); setShowMenu(false); }}>
                 ⬇️ 直达底部
               </Button>
-              <Button className="action-btn" size="mini" onClick={() => { handleExport(); setShowMenu(false); }}>
+              <Button className="action-btn" size="mini" onClick={() => { setShowExportSheet(true); setShowMenu(false); }}>
                 📤 导出
               </Button>
               <Button 
@@ -505,7 +491,46 @@ export default function StoryPage() {
         </View>
       </View>
 
+      {/* ================= 自定义导出动作面板 ================= */}
+      <View 
+        className={`export-sheet-mask ${showExportSheet ? 'show' : ''}`} 
+        onClick={() => setShowExportSheet(false)}
+      ></View>
+      <View className={`export-sheet ${showExportSheet ? 'show' : ''}`}>
+        <View className="sheet-header">
+          <Text>选择导出方式</Text>
+        </View>
+        
+        <View className="sheet-body">
+          <View className="sheet-item" onClick={handleCopyText}>
+            <Text className="item-text">📄 复制生成纯文本</Text>
+          </View>
+          <View className="sheet-item" onClick={() => exportAsFile('txt')}>
+            <Text className="item-text">📁 发送 TXT 文本文件</Text>
+          </View>
+          <View className="sheet-item" onClick={() => exportAsFile('md')}>
+            <Text className="item-text">📝 发送 Markdown 文件</Text>
+          </View>
+          <View className="sheet-item" onClick={handleExportImage}>
+            <Text className="item-text">🖼️ 生成排版长图</Text>
+          </View>
+          
+          {/* 灰色禁用的 App 专属按钮 */}
+          <View className="sheet-item disabled" onClick={handleDisabledAppExport}>
+            <Text className="item-text">📑 导出 PDF 文件</Text>
+            <Text className="tag-app">App专属</Text>
+          </View>
+          <View className="sheet-item disabled" onClick={handleDisabledAppExport}>
+            <Text className="item-text">📚 导出 EPUB 电子书</Text>
+            <Text className="tag-app">App专属</Text>
+          </View>
+        </View>
+        
+        <View className="sheet-footer" onClick={() => setShowExportSheet(false)}>
+          取消
+        </View>
+      </View>
+
     </View>
   )
 }
-           

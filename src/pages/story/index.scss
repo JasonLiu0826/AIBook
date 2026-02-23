@@ -333,7 +333,7 @@
 .custom-input-row {
   display: flex;
   align-items: center;
-  gap: 24rpx; // 将间距从 16rpx 稍微加大一点，让新按钮呼吸感更好
+  gap: 24rpx;
   width: 100%;
   
   .custom-input {
@@ -362,73 +362,64 @@
     }
   }
 
-/* ================= 新版汉堡菜单按钮样式 ================= */
-.btn-menu-modern {
-  // 外形设定：圆角矩形，而非傻傻的圆形
-  display: flex;
-  flex-direction: column;
-  justify-content: center; // 垂直居中内部的三条线
-  align-items: center;     // 水平居中内部的三条线
-  
-  width: 80rpx;  // 稍微大一点的触控区域，方形比例
-  height: 80rpx; // 与输入框高度大致匹配
-  
-  background: rgba(26, 26, 46, 0.6); // 默认半透明深色底
-  border: 2rpx solid rgba(74, 124, 89, 0.5); // 细一点的绿色边框，更有质感
-  border-radius: 20rpx; // 精致的圆角
-  
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); // 丝滑过渡
-  
-  // 内部三条线的通用样式（加长、加粗）
-  .menu-bar {
-    width: 48rpx; // 【改大】从 36rpx 增加到 48rpx，线更长
-    height: 6rpx; // 【加粗】从 4rpx 增加到 6rpx，比例更协调
-    background-color: #4a7c59; 
-    border-radius: 6rpx; // 圆角也稍微跟着变大
-    transition: all 0.3s ease;
-  }
-
-  // 分别设置三条线的位置间距（因为线变粗了，间距也要跟着拉开一点，不然会挤在一起）
-  .bar-top {
-    transform: translateY(-14rpx); // 【拉开】从 -10rpx 改为 -14rpx
-  }
-  .bar-middle {
-    // 中间线不动
-    transform: translateY(0);
-  }
-  .bar-bottom {
-    transform: translateY(14rpx); // 【拉开】从 10rpx 改为 14rpx
-  }
-
-  /* ----- 点击激活状态 ----- */
-  &.active {
-    background: #4a7c59; // 激活变实心绿底
-    border-color: #4a7c59;
-    box-shadow: 0 4rpx 12rpx rgba(74, 124, 89, 0.4); // 加一点发光效果
-
-    // 激活时线条变白色
-    .menu-bar {
-      background-color: #ffffff;
-    }
+  /* ================= 新版汉堡菜单按钮样式 ================= */
+  .btn-menu-modern {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     
-    // 可选进阶效果：激活时变成个叉号 (X)
-    // 如果不喜欢这个动画，把下面这几行删掉就行，线条就会保持三道杠变为白色
+    width: 80rpx; 
+    height: 80rpx; 
+    
+    background: rgba(26, 26, 46, 0.6); 
+    border: 2rpx solid rgba(74, 124, 89, 0.5);
+    border-radius: 20rpx;
+    
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    
+    .menu-bar {
+      width: 48rpx; 
+      height: 6rpx; 
+      background-color: #4a7c59; 
+      border-radius: 6rpx;
+      transition: all 0.3s ease;
+    }
+
     .bar-top {
-      transform: translateY(0) rotate(45deg);
+      transform: translateY(-14rpx);
     }
     .bar-middle {
-      opacity: 0; // 隐藏中间线
+      transform: translateY(0);
     }
     .bar-bottom {
-      transform: translateY(0) rotate(-45deg);
+      transform: translateY(14rpx);
+    }
+
+    &.active {
+      background: #4a7c59;
+      border-color: #4a7c59;
+      box-shadow: 0 4rpx 12rpx rgba(74, 124, 89, 0.4);
+
+      .menu-bar {
+        background-color: #ffffff;
+      }
+      
+      .bar-top {
+        transform: translateY(0) rotate(45deg);
+      }
+      .bar-middle {
+        opacity: 0; 
+      }
+      .bar-bottom {
+        transform: translateY(0) rotate(-45deg);
+      }
+    }
+
+    &:active {
+      transform: scale(0.92);
     }
   }
-
-  /* ----- 按下时的反馈 ----- */
-  &:active {
-    transform: scale(0.92); // 轻微缩小反馈
-  }
-}
 }
 
 /* 底部四功能导航面板（默认折叠隐藏，上浮动画） */
@@ -436,16 +427,16 @@
   display: flex;
   justify-content: space-between;
   gap: 16rpx;
-  max-height: 0;     /* 核心：用 max-height 做高度动画 */
+  max-height: 0;
   opacity: 0;
   overflow: hidden;
   margin-top: 0;
   transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
   
   &.show {
-    max-height: 100rpx; /* 展开后的极限高度 */
+    max-height: 100rpx; 
     opacity: 1;
-    margin-top: 24rpx;  /* 展开时与上一行拉开一点间距 */
+    margin-top: 24rpx;  
   }
   
   .action-btn {
@@ -486,7 +477,7 @@
   gap: 16rpx;
   -ms-flex-align: center;
   align-items: center;
-  justify-content: space-around; /* 🌟 居中分布按钮 */
+  justify-content: space-around; 
   
   .btn-bottom,
   .btn-export,
@@ -496,11 +487,11 @@
     background: rgba(26, 26, 46, 0.6);
     border: 1rpx solid rgba(74, 124, 89, 0.3);
     border-radius: 12rpx;
-    padding: 16rpx 20rpx; /* 🌟 调整内边距适应更短的文字 */
-    font-size: 24rpx; /* 🌟 稍微减小字体以适应更多按钮 */
+    padding: 16rpx 20rpx; 
+    font-size: 24rpx; 
     transition: all 0.3s ease;
-    flex: 1; /* 🌟 等宽分布 */
-    min-width: 20%; /* 🌟 最小宽度防止挤压 */
+    flex: 1; 
+    min-width: 20%;
     text-align: center;
     
     &:active {
@@ -524,40 +515,20 @@
 
 /* 动画定义 */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(30rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(-20rpx); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-/* 打字机标题动画 */
 @keyframes typingTitle {
-  0% {
-    opacity: 0;
-    transform: translateY(10rpx);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  0% { opacity: 0; transform: translateY(10rpx); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
-/* 光标闪烁动画 */
 .cursor {
   display: inline-block;
   width: 2rpx;
@@ -573,7 +544,6 @@
   50% { opacity: 0; }
 }
 
-/* 加载动画 */
 .loading-spinner {
   display: inline-block;
   width: 32rpx;
@@ -589,7 +559,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* 成功消息 */
 .success-message {
   padding: 24rpx;
   margin: 24rpx 0;
@@ -601,13 +570,9 @@
   font-weight: 500;
   border: 1rpx solid rgba(74, 124, 89, 0.3);
   
-  &:before {
-    content: '✨';
-    margin-right: 8rpx;
-  }
+  &:before { content: '✨'; margin-right: 8rpx; }
 }
 
-/* 空状态图标 */
 .empty-icon {
   font-size: 80rpx;
   margin-bottom: 32rpx;
@@ -622,24 +587,15 @@
   100% { transform: scale(1); opacity: 0.7; }
 }
 
-/* 输入框字符计数 */
 .input-counter {
   text-align: right;
   font-size: 24rpx;
   color: #666;
   margin-top: 8rpx;
-  
-  &.warning {
-    color: #ff9966;
-  }
-  
-  &.limit {
-    color: #ff6b6b;
-    font-weight: 500;
-  }
+  &.warning { color: #ff9966; }
+  &.limit { color: #ff6b6b; font-weight: 500; }
 }
 
-/* 分支建议 */
 .branch-suggestions {
   margin: 24rpx 0;
   padding: 24rpx;
@@ -674,7 +630,6 @@
       background: rgba(74, 124, 89, 0.3);
       transform: scale(0.95);
     }
-    
     &[disabled] {
       opacity: 0.5;
       transform: none;
@@ -682,7 +637,6 @@
   }
 }
 
-/* 统计面板 */
 .stats-panel {
   margin: 24rpx 0;
   padding: 20rpx 24rpx;
@@ -698,7 +652,6 @@
     font-weight: 500;
     margin-bottom: 8rpx;
   }
-  
   .stats-subtext {
     display: block;
     font-size: 24rpx;
@@ -706,7 +659,6 @@
   }
 }
 
-/* 章节元数据 */
 .chapter-meta {
   display: flex;
   justify-content: space-between;
@@ -717,15 +669,108 @@
   .meta-item {
     font-size: 24rpx;
     color: #88a898;
+    &:first-child:before { content: '⏰'; margin-right: 6rpx; }
+    &:last-child:before { content: '📝'; margin-right: 6rpx; }
+  }
+}
+
+/* ==================== 导出动作面板 (ActionSheet) ==================== */
+.export-sheet-mask {
+  position: fixed;
+  top: 0; 
+  left: 0; 
+  right: 0; 
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4rpx);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  
+  &.show {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+.export-sheet {
+  position: fixed;
+  left: 0; 
+  right: 0; 
+  bottom: 0;
+  background: #1a1a2e; /* 贴合你的主题底色 */
+  border-radius: 40rpx 40rpx 0 0;
+  z-index: 1000;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -10rpx 40rpx rgba(0, 0, 0, 0.3);
+  border-top: 1rpx solid rgba(74, 124, 89, 0.3);
+  
+  &.show {
+    transform: translateY(0);
+  }
+
+  .sheet-header {
+    text-align: center;
+    padding: 36rpx;
+    font-size: 28rpx;
+    color: #88a898;
+    border-bottom: 1rpx solid rgba(255, 255, 255, 0.05);
+  }
+
+  .sheet-body {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .sheet-item {
+    padding: 36rpx 48rpx;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1rpx solid rgba(255, 255, 255, 0.03);
+    transition: background 0.2s;
     
-    &:first-child:before {
-      content: '⏰';
-      margin-right: 6rpx;
+    .item-text {
+      font-size: 32rpx;
+      color: #e8e8e8;
     }
+
+    &:active {
+      background: rgba(74, 124, 89, 0.15);
+    }
+
+    /* 禁用的特殊状态 */
+    &.disabled {
+      .item-text {
+        color: #555566;
+      }
+      &:active {
+        background: transparent; /* 禁用项点击不变色 */
+      }
+      
+      .tag-app {
+        font-size: 22rpx;
+        background: rgba(255, 107, 107, 0.15);
+        color: #ff6b6b;
+        padding: 6rpx 16rpx;
+        border-radius: 20rpx;
+        border: 1rpx solid rgba(255, 107, 107, 0.3);
+      }
+    }
+  }
+
+  .sheet-footer {
+    padding: 36rpx;
+    text-align: center;
+    font-size: 32rpx;
+    color: #a0a0b0;
+    border-top: 16rpx solid #0f0f1a; /* 用深色区隔开取消按钮 */
     
-    &:last-child:before {
-      content: '📝';
-      margin-right: 6rpx;
+    &:active {
+      background: rgba(255, 255, 255, 0.05);
     }
   }
 }
