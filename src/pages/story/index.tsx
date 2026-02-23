@@ -58,6 +58,7 @@ export default function StoryPage() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [wordCount, setWordCount] = useState(0)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [showMenu, setShowMenu] = useState(false)
   
   const [typingChapter, setTypingChapter] = useState<Partial<Chapter> | null>(null)
   
@@ -72,7 +73,12 @@ export default function StoryPage() {
   
   // 添加直达底部的方法
   const scrollToBottom = () => {
-    setScrollToId('bottom-anchor')
+    // Taro 的 scrollIntoView 需要状态发生变化才会触发滚动。
+    // 所以我们先置空，在下一个事件循环中赋上锚点 ID，强制触发滚动动画。
+    setScrollToId('')
+    setTimeout(() => {
+      setScrollToId('bottom-anchor')
+    }, 50)
   }
 
   // 🌟 自动滚动逻辑：监听章节变化或打字机状态，自动拉取到底部
@@ -381,28 +387,78 @@ export default function StoryPage() {
           </View>
         )}
         
-        {/* 重构底部区域：把自定义输入框和按钮组整合在一起 */}
-        <View className="footer-container">
-          {/* 自定义输入框仅在需要选择分支时展示 */}
-          {lastChapter && lastChapter?.branches?.length > 0 && !lastChapter.selectedBranch && !generating && (
-            <View className="custom-input-row">
-              <Input
-                className="custom-input"
-                placeholder="自定义下一步剧情..."
-                value={customBranch}
-                onInput={(e) => setCustomBranch(e.detail.value)}
-                maxlength={100}
-              />
-              <Button 
-                className="btn-send" 
-                disabled={!customBranch.trim()} 
-                onClick={onCustomBranch}
-              >
-                发送
-              </Button>
-            </View>
-          )}
+    {/* 重构底部区域：带汉堡菜单的上浮式功能栏 */}
+    <View className="footer-container">
+      {/* 第一行：输入框 + 发送 + 菜单按钮 */}
+      <View className="custom-input-row">
+        {/* 只有在需要用户做决定时，才展示输入框和发送按钮 */}
+        {lastChapter && lastChapter?.branches?.length > 0 && !lastChapter.selectedBranch && !generating ? (
+          <>
+            <Input
+              className="custom-input"
+              placeholder="自定义下一步剧情..."
+              value={customBranch}
+              onInput={(e) => setCustomBranch(e.detail.value)}
+              maxlength={100}
+            />
+            <Button 
+              className="btn-send" 
+              disabled={!customBranch.trim()} 
+              onClick={onCustomBranch}
+            >
+              发送
+            </Button>
+          </>
+        ) : (
+          /* 如果不需要输入框，用一个空 View 占满左边，把菜单按钮挤到最右边 */
+          <View className="flex-spacer" style={{ flex: 1 }}></View>
+        )}
+
+        {/* 右侧的汉堡菜单按钮（现代版） */}
+        <View className={`btn-menu-modern ${showMenu ? 'active' : ''}`} onClick={() => setShowMenu(!showMenu)}>
+          <View className="menu-bar bar-top"></View>
+          <View className="menu-bar bar-middle"></View>
+          <View className="menu-bar bar-bottom"></View>
         </View>
+      </View>
+
+      {/* 第二行：隐藏的底部四项导航栏（通过 showMenu 控制上浮显示） */}
+      <View className={`footer-actions-panel ${showMenu ? 'show' : ''}`}>
+        {chapters?.length > 0 && (
+          <>
+            <Button className="action-btn" size="mini" onClick={() => { scrollToBottom(); setShowMenu(false); }}>
+              ⬇️ 直达底部
+            </Button>
+            <Button className="action-btn" size="mini" onClick={() => { handleExport(); setShowMenu(false); }}>
+              📤 导出
+            </Button>
+            <Button 
+              className="action-btn" 
+              size="mini" 
+              onClick={() => {
+                setShowMenu(false);
+                Taro.showModal({
+                  title: '重新开始',
+                  content: '确定要清空当前故事并重新开始吗？此操作不可恢复。',
+                  confirmColor: '#d9534f',
+                  success: (res) => {
+                    if (res.confirm) {
+                      resetStory()
+                      Taro.showToast({ title: '已清空故事', icon: 'success' })
+                    }
+                  }
+                })
+              }}
+            >
+              🔄 重启
+            </Button>
+          </>
+        )}
+        <Button className="action-btn primary" size="mini" onClick={() => Taro.redirectTo({ url: '/pages/story-list/index' })}>
+          📚 故事列表
+        </Button>
+      </View>
+    </View>
         
         {showSuccess && (
           <View className="success-message">
@@ -412,40 +468,9 @@ export default function StoryPage() {
               
         {error && <Text className="err">{error}</Text>}
         
-        {/* 在 ScrollView 最底部加一个锚点 */}
-        <View id="bottom-anchor" style={{ height: '20rpx' }}></View>
+        {/* 确保这行代码在 </ScrollView> 闭合标签的紧挨着上方 */}
+        <View id="bottom-anchor" style={{ height: '2rpx', width: '100%' }}></View>
       </ScrollView>
-      {/* 底部导航按钮组 */}
-      <View className="footer-actions">
-        {chapters?.length > 0 && (
-          <>
-            <Button className="action-btn" size="mini" onClick={scrollToBottom}>
-              ⬇️ 直达底部
-            </Button>
-            <Button className="action-btn" size="mini" onClick={handleExport}>
-              📤 导出
-            </Button>
-            <Button className="action-btn" size="mini" onClick={() => {
-              Taro.showModal({
-                title: '重新开始',
-                content: '确定要清空当前故事并重新开始吗？',
-                confirmColor: '#d9534f',
-                success: (res) => {
-                  if (res.confirm) {
-                    resetStory()
-                    Taro.showToast({ title: '已清空故事', icon: 'success' })
-                  }
-                }
-              })
-            }}>
-              🔄 重启
-            </Button>
-          </>
-        )}
-        <Button className="action-btn primary" size="mini" onClick={() => Taro.redirectTo({ url: '/pages/story-list/index' })}>
-          📚 故事列表
-        </Button>
-      </View>
     </View>
   )
 }

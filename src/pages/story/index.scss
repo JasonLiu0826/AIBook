@@ -312,7 +312,7 @@
     margin-right: 8rpx;
   }
 }
-/* 底部区域重构 */
+/* ==================== 底部悬浮区样式 ==================== */
 .footer-container {
   position: fixed;
   bottom: 0;
@@ -323,22 +323,22 @@
   backdrop-filter: blur(20rpx);
   display: flex;
   flex-direction: column;
-  padding: 16rpx 32rpx calc(20rpx + env(safe-area-inset-bottom)); /* 适配 iPhone 底部黑条 */
+  padding: 16rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
   z-index: 100;
 }
 
-/* 发送消息栏 */
+/* 包含 输入框 + 发送按钮 + 汉堡菜单 的水平行 */
 .custom-input-row {
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  margin-bottom: 20rpx;
+  gap: 24rpx; // 将间距从 16rpx 稍微加大一点，让新按钮呼吸感更好
+  width: 100%;
   
   .custom-input {
     flex: 1;
     background: rgba(26, 26, 46, 0.8);
     border: 1rpx solid #4a7c59;
-    border-radius: 40rpx; /* 圆角药丸形 */
+    border-radius: 40rpx;
     padding: 16rpx 32rpx;
     color: #e8e8e8;
     font-size: 28rpx;
@@ -349,22 +349,102 @@
     background: #4a7c59;
     color: #fff;
     border-radius: 40rpx;
-    padding: 0 40rpx;
+    padding: 0 32rpx;
     font-size: 28rpx;
-    line-height: 2.4;
+    line-height: 2.6;
+    height: 72rpx;
     
     &[disabled] {
       background: #2a3a30;
       color: #888;
     }
   }
+
+/* ================= 新版汉堡菜单按钮样式 ================= */
+.btn-menu-modern {
+  // 外形设定：圆角矩形，而非傻傻的圆形
+  display: flex;
+  flex-direction: column;
+  justify-content: center; // 垂直居中内部的三条线
+  align-items: center;     // 水平居中内部的三条线
+  
+  width: 80rpx;  // 稍微大一点的触控区域，方形比例
+  height: 80rpx; // 与输入框高度大致匹配
+  
+  background: rgba(26, 26, 46, 0.6); // 默认半透明深色底
+  border: 2rpx solid rgba(74, 124, 89, 0.5); // 细一点的绿色边框，更有质感
+  border-radius: 20rpx; // 精致的圆角
+  
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); // 丝滑过渡
+  
+  // 内部三条线的通用样式（加长、加粗）
+  .menu-bar {
+    width: 48rpx; // 【改大】从 36rpx 增加到 48rpx，线更长
+    height: 6rpx; // 【加粗】从 4rpx 增加到 6rpx，比例更协调
+    background-color: #4a7c59; 
+    border-radius: 6rpx; // 圆角也稍微跟着变大
+    transition: all 0.3s ease;
+  }
+
+  // 分别设置三条线的位置间距（因为线变粗了，间距也要跟着拉开一点，不然会挤在一起）
+  .bar-top {
+    transform: translateY(-14rpx); // 【拉开】从 -10rpx 改为 -14rpx
+  }
+  .bar-middle {
+    // 中间线不动
+    transform: translateY(0);
+  }
+  .bar-bottom {
+    transform: translateY(14rpx); // 【拉开】从 10rpx 改为 14rpx
+  }
+
+  /* ----- 点击激活状态 ----- */
+  &.active {
+    background: #4a7c59; // 激活变实心绿底
+    border-color: #4a7c59;
+    box-shadow: 0 4rpx 12rpx rgba(74, 124, 89, 0.4); // 加一点发光效果
+
+    // 激活时线条变白色
+    .menu-bar {
+      background-color: #ffffff;
+    }
+    
+    // 可选进阶效果：激活时变成个叉号 (X)
+    // 如果不喜欢这个动画，把下面这几行删掉就行，线条就会保持三道杠变为白色
+    .bar-top {
+      transform: translateY(0) rotate(45deg);
+    }
+    .bar-middle {
+      opacity: 0; // 隐藏中间线
+    }
+    .bar-bottom {
+      transform: translateY(0) rotate(-45deg);
+    }
+  }
+
+  /* ----- 按下时的反馈 ----- */
+  &:active {
+    transform: scale(0.92); // 轻微缩小反馈
+  }
+}
 }
 
-/* 底部导航栏 */
-.footer-actions {
+/* 底部四功能导航面板（默认折叠隐藏，上浮动画） */
+.footer-actions-panel {
   display: flex;
   justify-content: space-between;
   gap: 16rpx;
+  max-height: 0;     /* 核心：用 max-height 做高度动画 */
+  opacity: 0;
+  overflow: hidden;
+  margin-top: 0;
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  
+  &.show {
+    max-height: 100rpx; /* 展开后的极限高度 */
+    opacity: 1;
+    margin-top: 24rpx;  /* 展开时与上一行拉开一点间距 */
+  }
   
   .action-btn {
     flex: 1;
@@ -376,6 +456,11 @@
     padding: 12rpx 0;
     font-size: 24rpx;
     text-align: center;
+    transition: background 0.2s;
+    
+    &:active {
+      background: rgba(74, 124, 89, 0.3);
+    }
     
     &.primary {
       background: linear-gradient(135deg, #4a7c59 0%, #3a5c48 100%);
