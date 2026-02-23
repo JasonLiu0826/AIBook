@@ -29,6 +29,8 @@ type StoryContextValue = StoryState & {
   // 👇 新增：删除和重命名方法
   deleteStory: (id: string) => Promise<void>
   renameStory: (id: string, newTitle: string) => Promise<void>
+  // 👇 新增：更新上一章选择的方法
+  updateLastChapterChoice: (choice: string) => void
 }
 
 const StoryContext = createContext<StoryContextValue | null>(null)
@@ -208,6 +210,20 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentStoryId, saveStoryList])
 
+  // 👇 新增：更新上一章选择的方法
+  const updateLastChapterChoice = useCallback((choice: string) => {
+    setState((s) => {
+      if (s.chapters.length === 0) return s;
+      const newChapters = [...s.chapters];
+      const lastIndex = newChapters.length - 1;
+      newChapters[lastIndex] = {
+        ...newChapters[lastIndex],
+        selectedBranch: choice
+      };
+      return { ...s, chapters: newChapters };
+    });
+  }, []);
+
   const value: StoryContextValue = {
     ...state,
     storyList,
@@ -223,7 +239,8 @@ export function StoryProvider({ children }: { children: React.ReactNode }) {
     loadCurrentStory,
     saveCurrentStory,
     deleteStory,  // 暴露给外部使用
-    renameStory   // 暴露给外部使用
+    renameStory,  // 暴露给外部使用
+    updateLastChapterChoice  // 暴露给外部使用
   }
 
   return (

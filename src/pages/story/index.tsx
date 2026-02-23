@@ -48,8 +48,11 @@ export default function StoryPage() {
     generating,
     setGenerating,
     resetStory,
-    loadStoryList
+    loadStoryList,
+    updateLastChapterChoice
   } = useStory()
+  
+  const [scrollToId, setScrollToId] = useState('') // 用于直达底部
   const [customBranch, setCustomBranch] = useState('')
   const [error, setError] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
@@ -57,6 +60,32 @@ export default function StoryPage() {
   const [autoScroll, setAutoScroll] = useState(true)
   
   const [typingChapter, setTypingChapter] = useState<Partial<Chapter> | null>(null)
+  
+  // ✅ 替换为这行：使用 scrollTop 强制控制滚动高度
+  const [scrollTop, setScrollTop] = useState(0)
+
+  // 🌟 核心绝招：强行把高度设为 99999。
+  // 如果当前已经是 99999，就设为 99998 制造微小差异，逼迫小程序重新执行到底部的滚动动画！
+  const handleScrollToBottom = () => {
+    setScrollTop(prev => prev === 99999 ? 99998 : 99999)
+  }
+  
+  // 添加直达底部的方法
+  const scrollToBottom = () => {
+    setScrollToId('bottom-anchor')
+  }
+
+  // 🌟 自动滚动逻辑：监听章节变化或打字机状态，自动拉取到底部
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (generating && typingChapter) {
+        handleScrollToBottom()
+      } else if (chapters && chapters.length > 0) {
+        handleScrollToBottom()
+      }
+    }, 100) // 延迟100ms确保新内容渲染完毕
+    return () => clearTimeout(timer)
+  }, [chapters?.length, generating, typingChapter?.index])
 
   const apiConfigured = isGenerateApiConfigured(config.aiProvider, config.apiKey)
   const lastChapter = useMemo(() => chapters?.[chapters.length - 1], [chapters])
@@ -93,6 +122,9 @@ export default function StoryPage() {
   }, [loadStoryList])
 
   const doGenerate = async (chosenBranch?: string) => {
+    if (chosenBranch && chapters?.length) {
+      updateLastChapterChoice(chosenBranch) // 立即把选项变成右侧聊天气泡
+    }
     setError('')
     setShowSuccess(false)
     setGenerating(true)
@@ -277,7 +309,13 @@ export default function StoryPage() {
 
   return (
     <View className="page-story">
-      <ScrollView scrollY className="scroll" scrollWithAnimation>
+      {/* 增加 scrollIntoView 绑定 */}
+      <ScrollView 
+        scrollY 
+        className="scroll" 
+        scrollWithAnimation
+        scrollIntoView={scrollToId}
+      >
         {!apiConfigured && (!chapters || chapters.length === 0) && (
           <View className="api-tip">
             <Text>💡 温馨提示：您尚未配置AI生成接口，系统将为您展示精彩的故事示例。配置后端接口后即可享受完整的AI创作体验！</Text>
@@ -297,7 +335,7 @@ export default function StoryPage() {
           </View>
         )}
         
-        {/* 🌟 修复点 3：遍历列表时防旧数据格式崩溃 */}
+        {/* 核心修改：遍历章节，支持selectedBranch气泡显示 */}
         {chapters?.map((ch, i) => {
           const isLast = i === chapters.length - 1
           return (
@@ -306,35 +344,34 @@ export default function StoryPage() {
               <Text className="chapter-title">{ch?.title}</Text>
               <Text className="chapter-content">{ch?.content}</Text>
               
-              {isLast && ch?.branches?.length > 0 && (
-                <View className="branches">
-                  <Text className="branches-label">选择下一步剧情发展：</Text>
-                  {/* 🌟 修复点 4：兼容老旧的单纯字符串分支格式 */}
-                  {ch.branches.map((b, idx) => {
-                    const text = typeof b === 'string' ? b : b?.text;
-                    const id = typeof b === 'string' ? `b_${idx}` : (b?.id || `b_${idx}`);
-                    
-                    return (
-                      <Button
-                        key={id}
-                        className="branch-btn"
-                        onClick={() => onSelectBranch(text)}
-                        disabled={generating}
-                      >
-                        {generating ? (
-                          <><View className="loading-spinner"></View>生成中…</>
-                        ) : text}
-                      </Button>
-                    )
-                  })}
+              {/* 核心修改：如果有 selectedBranch，说明用户选过了，展示为气泡 */}
+              {ch.selectedBranch ? (
+                <View className="user-message-bubble">
+                  <Text>{ch.selectedBranch}</Text>
                 </View>
+              ) : (
+                // 没选过且是最后一章，展示原来的三个分支按钮
+                isLast && ch?.branches?.length > 0 && !generating && (
+                  <View className="branches">
+                    <Text className="branches-label">选择下一步剧情发展：</Text>
+                    {ch.branches.map((b, idx) => {
+                      const text = typeof b === 'string' ? b : b?.text;
+                      const id = typeof b === 'string' ? `b_${idx}` : (b?.id || `b_${idx}`);
+                      return (
+                        <Button key={id} className="branch-btn" onClick={() => onSelectBranch(text)}>
+                          {text}
+                        </Button>
+                      )
+                    })}
+                  </View>
+                )
               )}
             </View>
           )
         })}
         
         {typingChapter && (
-          <View className="chapter generating-preview">
+          <View id="typing-chapter" className="chapter generating-preview">
             <Text className="chapter-index">第 {typingChapter.index} 章</Text>
             <Text className="chapter-title">{typingChapter.title || '系统正在酝酿标题...'}</Text>
             <Text className="chapter-content">
@@ -344,76 +381,68 @@ export default function StoryPage() {
           </View>
         )}
         
-        {/* 🌟 修复点 5：这里是被截断的自定义分支输入安全判断 */}
-        {lastChapter && lastChapter?.branches?.length > 0 && (
-          <View className="custom-branch">
-            <Text className="custom-label">发挥创意，自定义剧情：</Text>
-            <Input
-              className="custom-input"
-              placeholder="例如：主角突然觉醒了神秘力量…"
-              value={customBranch}
-              onInput={(e) => {
-                const value = e.detail.value
-                setCustomBranch(value)
-                setWordCount(value.length)
-              }}
-              maxlength={100}
-            />
-            <View className={`input-counter ${wordCount > 80 ? 'warning' : wordCount >= 100 ? 'limit' : ''}`}>
-              {wordCount}/100字
+        {/* 重构底部区域：把自定义输入框和按钮组整合在一起 */}
+        <View className="footer-container">
+          {/* 自定义输入框仅在需要选择分支时展示 */}
+          {lastChapter && lastChapter?.branches?.length > 0 && !lastChapter.selectedBranch && !generating && (
+            <View className="custom-input-row">
+              <Input
+                className="custom-input"
+                placeholder="自定义下一步剧情..."
+                value={customBranch}
+                onInput={(e) => setCustomBranch(e.detail.value)}
+                maxlength={100}
+              />
+              <Button 
+                className="btn-send" 
+                disabled={!customBranch.trim()} 
+                onClick={onCustomBranch}
+              >
+                发送
+              </Button>
             </View>
-            <Button 
-              className="btn-custom" 
-              disabled={generating || !customBranch.trim()} 
-              onClick={onCustomBranch}
-            >
-              {generating ? (
-                <><View className="loading-spinner"></View>生成中…</>
-              ) : '🎯 按此分支续写'}
-            </Button>
-          </View>
-        )}
+          )}
+        </View>
         
         {showSuccess && (
           <View className="success-message">
             <Text>🎉 章节生成完成！</Text>
           </View>
         )}
-        
+              
         {error && <Text className="err">{error}</Text>}
+        
+        {/* 在 ScrollView 最底部加一个锚点 */}
+        <View id="bottom-anchor" style={{ height: '20rpx' }}></View>
       </ScrollView>
-      <View className="footer">
+      {/* 底部导航按钮组 */}
+      <View className="footer-actions">
         {chapters?.length > 0 && (
           <>
-            <Button className="btn-export" size="mini" onClick={handleExport}>
-              📤 导出全文
+            <Button className="action-btn" size="mini" onClick={scrollToBottom}>
+              ⬇️ 直达底部
             </Button>
-            <Button
-              className="btn-reset"
-              size="mini"
-              onClick={() => {
-                Taro.showModal({
-                  title: '重新开始',
-                  content: '确定要清空当前故事并重新开始吗？此操作不可恢复。',
-                  confirmColor: '#d9534f',
-                  success: (res) => {
-                    if (res.confirm) {
-                      resetStory()
-                      Taro.showToast({ title: '已清空故事', icon: 'success' })
-                    }
+            <Button className="action-btn" size="mini" onClick={handleExport}>
+              📤 导出
+            </Button>
+            <Button className="action-btn" size="mini" onClick={() => {
+              Taro.showModal({
+                title: '重新开始',
+                content: '确定要清空当前故事并重新开始吗？',
+                confirmColor: '#d9534f',
+                success: (res) => {
+                  if (res.confirm) {
+                    resetStory()
+                    Taro.showToast({ title: '已清空故事', icon: 'success' })
                   }
-                })
-              }}
-            >
-              🔄 重新开始
+                }
+              })
+            }}>
+              🔄 重启
             </Button>
           </>
         )}
-        <Button 
-          className="btn-list" 
-          size="mini" 
-          onClick={() => Taro.redirectTo({ url: '/pages/story-list/index' })}
-        >
+        <Button className="action-btn primary" size="mini" onClick={() => Taro.redirectTo({ url: '/pages/story-list/index' })}>
           📚 故事列表
         </Button>
       </View>

@@ -1,6 +1,15 @@
 import Taro from '@tarojs/taro'
 import { API_BASE_URL } from '@/config'
 
+// 新增计算函数
+function calculateWordLimit(inputText: string): number {
+  const baseLength = inputText.length;
+  // 生成字数在 100 到 300 之间，最高不超过 500
+  const targetLength = Math.max(100, Math.min(500, Math.floor(baseLength * 1.5)));
+  // 如果原文本很长，强制封顶 500
+  return targetLength > 500 ? 500 : targetLength;
+}
+
 /**
  * AI 润色接口。
  * 将用户输入的文字发送到后端，返回润色后的文本。
@@ -14,11 +23,18 @@ import { API_BASE_URL } from '@/config'
 export async function polishText(text: string, type: string, apiKey: string): Promise<string> {
   const baseURL = API_BASE_URL
   
+  // 计算目标字数并构建带字数限制的提示词
+  const targetWords = calculateWordLimit(text);
+  const systemPrompt = `你是一个专业的小说润色助手。请帮我润色以下小说片段。
+要求：
+1. 保持原意，提升文笔。
+2. 严格控制字数，智能化输出！本次润色的输出内容必须在 ${targetWords} 字左右，绝对不可超过 500 字！`;
+  
   try {
     const res = await Taro.request({
       url: `${baseURL}/polish`,
       method: 'POST',
-      data: { text, type, apiKey },
+      data: { text, type, apiKey, systemPrompt },
       header: { 'Content-Type': 'application/json' },
       // 🌟 修复 1：强行把超时时间延长到 120 秒（2分钟），给 AI 充分的思考时间
       timeout: 120000 

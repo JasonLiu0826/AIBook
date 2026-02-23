@@ -51,6 +51,8 @@ export interface Chapter {
   branches: BranchOption[]
   /** 生成时间 */
   createdAt: number
+  /** 新增：记录用户看完这一章后，最终选择了哪个分支文本 */
+  selectedBranch?: string
 }
 
 /** 故事状态（单本书的会话） */
