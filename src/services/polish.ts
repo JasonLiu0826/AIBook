@@ -5,34 +5,46 @@ import { API_BASE_URL } from '@/config'
  * AI 润色接口。
  * 将用户输入的文字发送到后端，返回润色后的文本。
  * 使用用户配置的API密钥调用真实的AI服务。
+ * 
+ * 🌟 优化说明：
+ * 1. 增加超时时间至120秒，给AI充分思考时间
+ * 2. 精准错误处理，区分不同类型的错误
+ * 3. 透传后端返回的具体错误信息
  */
-export function polishText(text: string, type: string, apiKey: string): Promise<string> {
+export async function polishText(text: string, type: string, apiKey: string): Promise<string> {
   const baseURL = API_BASE_URL
-  return new Promise((resolve, reject) => {
-    Taro.request({
+  
+  try {
+    const res = await Taro.request({
       url: `${baseURL}/polish`,
       method: 'POST',
       data: { text, type, apiKey },
-      header: { 'Content-Type': 'application/json' }
+      header: { 'Content-Type': 'application/json' },
+      // 🌟 修复 1：强行把超时时间延长到 120 秒（2分钟），给 AI 充分的思考时间
+      timeout: 120000 
     })
-      .then((res) => {
-        if (res.statusCode !== 200) {
-          reject(new Error(`润色失败: ${res.statusCode}`))
-          return
-        }
-        const data = res.data as { text?: string }
-        if (typeof data?.text !== 'string') {
-          reject(new Error('返回格式错误：需要 text 字符串'))
-          return
-        }
-        resolve(data.text)
-      })
-      .catch(reject)
-  })
+
+    // 🌟 修复 2：如果状态码不是 200，说明后端/大模型报错了
+    if (res.statusCode !== 200) {
+      // 尝试提取真实的报错原因（比如 DeepSeek 官方返回的繁忙提示）
+      const errorMsg = (res.data as any)?.error || `服务器异常(状态码: ${res.statusCode})`
+      throw new Error(errorMsg)
+    }
+
+    const data = res.data as { text?: string }
+    return data.text || ''
+    
+  } catch (err: any) {
+    // 🌟 修复 3：精准捕获网络断开或超时错误
+    if (err.errMsg && err.errMsg.includes('timeout')) {
+      throw new Error('AI 思考时间太长，请求超时了，请重试')
+    }
+    // 抛出具体的错误给页面显示
+    throw new Error(err.message || '润色请求失败，请检查网络')
+  }
 }
 
 /** 是否已配置真实后端（非占位 URL） */
 export function isPolishApiConfigured(): boolean {
-  const base = 'http://192.168.3.5:3000'
-  return !base.includes('your-api.com')
+  return !API_BASE_URL.includes('your-api.com')
 }
