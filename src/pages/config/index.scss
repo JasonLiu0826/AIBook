@@ -33,3 +33,54 @@
     color: #666;
   }
 }
+
+// ✅ 新增样式
+.setting-item {
+  margin-bottom: 40rpx;
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16rpx;
+    
+    text {
+      font-size: 28rpx;
+      color: #e8e8e8;
+      font-weight: bold;
+    }
+    
+    button {
+      background: linear-gradient(45deg, #6a11cb, #2575fc);
+      color: white;
+      border: none;
+      border-radius: 8rpx;
+      font-size: 24rpx;
+      padding: 12rpx 20rpx;
+    }
+  }
+  
+  .textarea {
+    width: 100%;
+    padding: 24rpx;
+    background: #1a1a2e;
+    border: 1rpx solid #2a2a4a;
+    border-radius: 12rpx;
+    color: #e8e8e8;
+    font-size: 28rpx;
+    min-height: 200rpx;
+    line-height: 1.6;
+  }
+  
+  .node-area {
+    width: 100%;
+    padding: 24rpx;
+    background: #1a1a2e;
+    border: 2rpx solid #4a90e2;
+    border-radius: 12rpx;
+    color: #e8e8e8;
+    font-size: 26rpx;
+    min-height: 300rpx;
+    line-height: 1.6;
+  }
+}
