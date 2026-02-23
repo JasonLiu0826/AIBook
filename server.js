@@ -157,20 +157,84 @@ app.post('/generate', async (req, res) => {
   }
 });
 
-// 润色接口
-app.post('/polish', (req, res) => {
-  console.log('收到润色请求:', req.body);
+// 真实的 AI 润色接口
+app.post('/polish', async (req, res) => {
+  console.log('收到AI润色请求:', req.body);
   
-  const { text } = req.body;
-  if (!text) {
-    return res.status(400).json({ error: '缺少文本内容' });
+  const { text, type, apiKey } = req.body;
+  if (!text || !apiKey) {
+    return res.status(400).json({ error: '缺少内容或 API Key' });
   }
 
-  // 简单的文本润色模拟
-  setTimeout(() => {
-    const polishedText = text.replace(/([。！？])/g, '$1 ').trim();
-    res.json({ text: polishedText });
-  }, 1000);
+  try {
+    // 使用用户提供的 API Key
+    const openai = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: apiKey,
+    });
+
+    const completion = await openai.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        { 
+          role: 'system', 
+          content: '你是一位金牌小说编辑。请根据用户提供的设定草稿进行专业润色。要求：语言简练、画面感强、逻辑严密，保留原意但提升文采。直接返回润色后的内容，不要有任何开场白。' 
+        },
+        { 
+          role: 'user', 
+          content: `请润色这段小说设定（类型：${type || '通用'}）：\n${text}` 
+        }
+      ]
+    });
+    
+    res.json({ text: completion.choices[0].message.content });
+  } catch (error) {
+    console.error('AI润色请求报错:', error.message);
+    res.status(500).json({ error: `AI润色失败：${error.message}` });
+  }
+});
+
+// 智能化关键节点提炼接口
+app.post('/summarize-node', async (req, res) => {
+  console.log('收到节点提炼请求:', req.body);
+  
+  const { chapterContent, chapterTitle, apiKey } = req.body;
+  if (!chapterContent || !chapterTitle || !apiKey) {
+    return res.status(400).json({ error: '缺少必要参数' });
+  }
+
+  try {
+    // 使用用户提供的 API Key
+    const openai = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: apiKey,
+    });
+
+    const completion = await openai.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        { 
+          role: 'system', 
+          content: '你是一位冷酷的故事记录员。你的任务是将本章小说内容压缩成一行"不可逆的剧情锚点"。要求：1. 极其简洁（20字以内）。2. 只记录关键转折或重要获得。3. 使用"主角+做了某事+结果"的格式。4. 如果没有重大事件就返回"无重要更新"。' 
+        },
+        { 
+          role: 'user', 
+          content: `请提炼《${chapterTitle}》的关键点：\n${chapterContent}` 
+        }
+      ]
+    });
+    
+    const summary = completion.choices[0].message.content.trim();
+    // 如果AI返回"无重要更新"或类似表述，则不记录节点
+    if (summary.includes('无重要更新') || summary.includes('没有重大') || summary.includes('无显著')) {
+      res.json({ summary: '' });
+    } else {
+      res.json({ summary: summary });
+    }
+  } catch (error) {
+    console.error('节点提炼请求报错:', error.message);
+    res.status(500).json({ error: `节点提炼失败：${error.message}` });
+  }
 });
 
 // 健康检查接口

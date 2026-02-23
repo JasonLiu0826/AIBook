@@ -1,17 +1,18 @@
 import Taro from '@tarojs/taro'
+import { API_BASE_URL } from '@/config'
 
 /**
- * AI 润色接口（预留）。
+ * AI 润色接口。
  * 将用户输入的文字发送到后端，返回润色后的文本。
- * 后端需实现 POST {baseURL}/polish，Body: { text: string }，响应: { text: string }。
+ * 使用用户配置的API密钥调用真实的AI服务。
  */
-export function polishText(text: string): Promise<string> {
-  const baseURL = 'http://192.168.3.5:3000'
+export function polishText(text: string, type: string, apiKey: string): Promise<string> {
+  const baseURL = API_BASE_URL
   return new Promise((resolve, reject) => {
     Taro.request({
       url: `${baseURL}/polish`,
       method: 'POST',
-      data: { text },
+      data: { text, type, apiKey },
       header: { 'Content-Type': 'application/json' }
     })
       .then((res) => {

@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro'
 import type { GenerateParams, GenerateResult, Chapter } from '@/types'
+import { API_BASE_URL } from '@/config'
 
 // 👇 把这段代码粘贴在这里，这是一个所有手机都兼容的万能解码器
 class Utf8Decoder {
@@ -75,8 +76,8 @@ export async function generateChapter(params: GenerateParams): Promise<GenerateR
   })
 }
 
-/** 后端 API 根地址。本地开发环境使用 192.168.3.5 */
-const getApiBase = (): string => 'http://192.168.3.5:3000'
+/** 后端 API 根地址。读取全局配置 */
+const getApiBase = (): string => API_BASE_URL
 
 export async function generateChapterStream(
   params: GenerateParams, 
@@ -195,4 +196,46 @@ export function getMockFirstChapter(): GenerateResult {
     content: `夜色如墨，雨丝斜织。林默站在老旧公寓的窗前，手中握着一封泛黄的信封。`,
     branches: ['跟随', '研究', '联系']
   }
+}
+
+/**
+ * 智能化关键节点提炼
+ * @param chapterTitle 章节标题
+ * @param chapterContent 章节内容
+ * @param apiKey 用户API密钥
+ * @returns 提取的关键节点文本
+ */
+export async function summarizeChapterNode(
+  chapterTitle: string, 
+  chapterContent: string, 
+  apiKey: string
+): Promise<string> {
+  const baseURL = getApiBase()
+  
+  if (baseURL.includes('your-api.com')) {
+    // 模拟模式下返回空字符串（不记录节点）
+    return ''
+  }
+
+  return new Promise((resolve, reject) => {
+    Taro.request({
+      url: `${baseURL}/summarize-node`,
+      method: 'POST',
+      data: { chapterTitle, chapterContent, apiKey },
+      header: { 'Content-Type': 'application/json' }
+    })
+      .then((res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`节点提炼失败: ${res.statusCode}`))
+          return
+        }
+        const data = res.data as { summary?: string }
+        if (typeof data?.summary !== 'string') {
+          reject(new Error('返回格式错误：需要 summary 字符串'))
+          return
+        }
+        resolve(data.summary)
+      })
+      .catch(reject)
+  })
 }

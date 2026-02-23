@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { View, Text, Textarea, Button } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import { useSettings } from '@/store/settings'
-import { polishText, isPolishApiConfigured } from '@/services/polish'
+import { polishText } from '@/services/polish'
+import { useUserConfig } from '@/store/userConfig'
 import type { SettingDocKey } from '@/types'
 import { MAX_SETTING_CHARS, MAX_MD_FILE_BYTES } from '@/constants/settings'
 import './index.scss'
@@ -12,6 +13,7 @@ const KEYS: SettingDocKey[] = ['characters', 'worldview', 'scenes', 'mainPlot', 
 export default function EditorPage() {
   const router = useRouter()
   const { settings, setOne, save } = useSettings()
+  const { config } = useUserConfig()
   const key = (router.params.key || 'characters') as SettingDocKey
   const title = decodeURIComponent(router.params.title || '设定')
   const [value, setValue] = useState(settings[key] || '')
@@ -97,8 +99,8 @@ export default function EditorPage() {
       // 移除BOM标记
       content = content.replace(/^\uFEFF/, '')
       
-      // 修复点：将意外断行的正则表达式和字符串恢复为单行格式
-      content = content.replace(/\n\s*\n\s*\n/g, '\n\n')
+      // 将多个连续空行（含空白）合并为单个换行
+      content = content.replace(/\n\s*\n\s*/g, '\n')
       
       if (content) {
         // 显示文件信息
@@ -139,17 +141,29 @@ export default function EditorPage() {
       Taro.showToast({ title: '请先输入要润色的内容', icon: 'none' })
       return
     }
-    if (!isPolishApiConfigured()) {
-      Taro.showToast({ title: '请先配置润色接口（API 预留）', icon: 'none' })
+    
+    // 检查API配置
+    if (!config.apiKey?.trim()) {
+      Taro.showToast({ 
+        title: '请先在"AI模型配置"中填写API密钥', 
+        icon: 'none' 
+      })
       return
     }
+    
     setPolishing(true)
     try {
-      const result = await polishText(trimmed)
+      Taro.showLoading({ title: 'AI正在精雕细琢...' })
+      const result = await polishText(trimmed, title, config.apiKey)
       setValue(result)
+      Taro.hideLoading()
       Taro.showToast({ title: '润色完成', icon: 'success' })
     } catch (e) {
-      Taro.showToast({ title: e instanceof Error ? e.message : '润色失败', icon: 'none' })
+      Taro.hideLoading()
+      Taro.showToast({ 
+        title: e instanceof Error ? e.message : '润色请求失败', 
+        icon: 'none' 
+      })
     } finally {
       setPolishing(false)
     }

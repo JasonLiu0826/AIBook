@@ -4,7 +4,7 @@ import Taro from '@tarojs/taro'
 import { useSettings } from '@/store/settings'
 import { useUserConfig } from '@/store/userConfig'
 import { useStory } from '@/store/story'
-import { generateChapterStream, isGenerateApiConfigured, getMockFirstChapter } from '@/services/ai'
+import { generateChapterStream, isGenerateApiConfigured, getMockFirstChapter, summarizeChapterNode } from '@/services/ai'
 import type { Chapter, BranchOption } from '@/types'
 import './index.scss'
 
@@ -171,6 +171,30 @@ export default function StoryPage() {
       
       addChapter(chapter)
       setShowSuccess(true)
+      
+      // 🌟【新增】智能化记录关键剧情节点
+      if (config.apiKey) {
+        console.log('正在自动记录重要剧情节点...');
+        summarizeChapterNode(chapter.title, chapter.content, config.apiKey)
+          .then(summary => {
+            if (summary && summary.trim()) {
+              const currentNodes = settings.storyNodes || '';
+              const newNodeEntry = `- 第${chapter.index}章：${summary}`;
+              const updatedNodes = currentNodes + (currentNodes ? '\n' : '') + newNodeEntry;
+              
+              // 自动写入"重要故事节点更新"模块
+              settings.storyNodes = updatedNodes;
+              saveSettings();
+              console.log('剧情节点记录成功:', newNodeEntry);
+            } else {
+              console.log('本章无重要节点更新');
+            }
+          })
+          .catch(err => {
+            console.error('剧情总结失败:', err);
+            // 静默失败，不影响主流程
+          });
+      }
       
     } catch (e) {
       const msg = e instanceof Error ? e.message : '生成失败，请稍后重试'
