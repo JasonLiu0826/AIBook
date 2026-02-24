@@ -1,11 +1,7 @@
 .page-editor {
   padding: 24rpx 32rpx;
   min-height: 100vh;
-  
-  // 移动端优化
-  @media screen and (max-width: 768px) {
-    padding: 20rpx 24rpx;
-  }
+  @media screen and (max-width: 768px) { padding: 20rpx 24rpx; }
 }
 .label {
   margin-bottom: 16rpx;
@@ -18,13 +14,6 @@
   gap: 16rpx;
   margin-bottom: 24rpx;
   padding: 20rpx 0;
-  min-height: 80rpx;
-  
-  // 移动端优化
-  @media screen and (max-width: 768px) {
-    gap: 12rpx;
-    padding: 16rpx 0;
-  }
   
   .toolbar-btn {
     background: #1a1a2e;
@@ -35,51 +24,92 @@
     font-size: 26rpx;
     line-height: 1.4;
     
-    // 移动端触摸优化
-    @media screen and (max-width: 768px) {
-      padding: 20rpx 28rpx;
-      font-size: 28rpx;
-      min-width: 120rpx;
-      text-align: center;
-    }
-    
-    // 触摸反馈优化
-    &:active {
-      transform: scale(0.95);
-      transition: transform 0.1s ease;
-    }
-    
-    &.polish {
-      border-color: #4a7c59;
-      color: #7cb88c;
-    }
+    &:active { transform: scale(0.95); transition: transform 0.1s ease; }
+    &.polish { border-color: #4a7c59; color: #7cb88c; }
   }
 }
-.textarea {
+
+/* 🌟 输入框与附件大容器 */
+.textarea-container {
   width: 100%;
   min-height: 400rpx;
-  padding: 24rpx;
-  box-sizing: border-box;
   background: #1a1a2e;
   border: 1rpx solid #2a2a4a;
   border-radius: 12rpx;
-  color: #e8e8e8;
-  font-size: 28rpx;
-  
-  // 移动端优化
-  @media screen and (max-width: 768px) {
-    min-height: 350rpx;
-    padding: 20rpx;
-    font-size: 30rpx;
-    line-height: 1.6;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s;
+
+  &:focus-within { border-color: #4a7c59; }
+
+  .textarea {
+    flex: 1;
+    width: 100%;
+    min-height: 300rpx;
+    padding: 24rpx;
+    box-sizing: border-box;
+    background: transparent;
+    border: none;
+    color: #e8e8e8;
+    font-size: 28rpx;
+    &:focus { outline: none; }
   }
-  
-  // 触摸优化
-  &:focus {
-    border-color: #4a7c59;
-    outline: none;
+
+  /* 🌟 文件附件卡片 UI */
+  .attached-file-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 24rpx 24rpx 24rpx;
+    padding: 20rpx 24rpx;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12rpx;
+    border: 1rpx dashed rgba(255, 255, 255, 0.15);
+
+    .file-info-left { display: flex; align-items: center; gap: 20rpx; }
+    .file-icon { font-size: 48rpx; }
+
+    .file-details {
+      display: flex;
+      flex-direction: column;
+      
+      .file-name {
+        font-size: 28rpx;
+        color: #e8e8e8;
+        max-width: 380rpx;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .file-size {
+        font-size: 24rpx;
+        color: #888;
+        margin-top: 6rpx;
+      }
+    }
+
+    .file-remove {
+      font-size: 36rpx;
+      color: #ff6b6b;
+      padding: 10rpx 20rpx;
+      opacity: 0.8;
+      &:active { opacity: 1; transform: scale(0.9); }
+    }
   }
 }
+
+.hint-text {
+  margin-top: 16rpx;
+  padding: 0 8rpx;
+  text {
+    font-size: 24rpx;
+    color: #7a7a7a;
+    line-height: 1.5;
+    word-break: break-all;
+  }
+}
+
 .btn-save {
   margin-top: 32rpx;
   background: #4a7c59;
@@ -87,33 +117,60 @@
   border-radius: 12rpx;
   padding: 24rpx;
   font-size: 32rpx;
-  font-weight: 500;
+  &:active { background: #3d664a; transform: scale(0.98); }
+}
+
+/* 🌟 全屏预览 Modal 样式 */
+.preview-modal {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(20, 20, 30, 0.98);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.2s ease-out;
   
-  // 移动端优化
-  @media screen and (max-width: 768px) {
-    padding: 28rpx;
-    font-size: 34rpx;
-    margin-top: 40rpx;
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 30rpx 40rpx;
+    background: #1a1a2e;
+    border-bottom: 1rpx solid #2a2a4a;
+    
+    .title {
+      color: #fff;
+      font-size: 32rpx;
+      font-weight: bold;
+      max-width: 500rpx;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .close-btn {
+      color: #7cb88c;
+      font-size: 28rpx;
+      padding: 10rpx;
+    }
   }
   
-  // 触摸反馈
-  &:active {
-    background: #3d664a;
-    transform: scale(0.98);
-    transition: all 0.1s ease;
+  .preview-content {
+    flex: 1;
+    padding: 40rpx;
+    box-sizing: border-box;
+    
+    text {
+      color: #d1d1d1;
+      font-size: 28rpx;
+      line-height: 1.8;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
   }
 }
 
-/* 追加在 index.scss 最下面 */
-
-.hint-text {
-  margin-top: 16rpx;
-  padding: 0 8rpx;
-  
-  text {
-    font-size: 24rpx;
-    color: #7a7a7a;
-    line-height: 1.5;
-    word-break: break-all;
-  }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

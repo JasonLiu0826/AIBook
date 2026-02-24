@@ -41,7 +41,14 @@ function genId() {
 
 function exportChaptersToText(chapters: Chapter[]): string {
   const timestamp = new Date().toLocaleString('zh-CN')
-  const header = `📖 AI互动小说导出\n\n导出时间: ${timestamp}\n总章节数: ${chapters?.length || 0}章\n\n${'='.repeat(50)}\n\n`
+  const header = `📖 AI互动小说导出
+
+导出时间: ${timestamp}
+总章节数: ${chapters?.length || 0}章
+
+${'='.repeat(50)}
+
+`
   
   const content = (chapters || [])
     .map((ch, index) => {
@@ -50,16 +57,31 @@ function exportChaptersToText(chapters: Chapter[]): string {
     })
     .join('\n')
   
-  const footer = `\n\n${'='.repeat(50)}\n\n📝 本故事由AIBook智能创作助手生成`  
+  const footer = `
+
+${'='.repeat(50)}
+
+📝 本故事由AIBook智能创作助手生成`  
   return header + content + footer
 }
 
 function exportChaptersToMarkdown(chapters: Chapter[]): string {
   const timestamp = new Date().toLocaleString('zh-CN')
-  let md = `# 📖 AI互动小说导出\n\n> 导出时间: ${timestamp}\n> 总章节数: ${chapters?.length || 0}章\n\n---\n\n`;
+  let md = `# 📖 AI互动小说导出
+
+> 导出时间: ${timestamp}
+> 总章节数: ${chapters?.length || 0}章
+
+---
+
+`;
   
   (chapters || []).forEach((ch, index) => {
-    md += `## 第 ${ch?.index || index + 1} 章 ${ch?.title || ''}\n\n${ch?.content || ''}\n\n`;
+    md += `## 第 ${ch?.index || index + 1} 章 ${ch?.title || ''}
+
+${ch?.content || ''}
+
+`;
     if (ch.selectedBranch) {
       md += `*👤 用户选择：${ch.selectedBranch}*\n\n`;
     }
@@ -70,7 +92,7 @@ function exportChaptersToMarkdown(chapters: Chapter[]): string {
 }
 
 export default function StoryPage() {
-  const { settings, save: saveSettings } = useSettings()
+  const { settings, attachedFiles, save: saveSettings } = useSettings()
   // 🌟 核心修复：整个组件内部只保留这一次 config 声明
   const { config } = useUserConfig()
   
@@ -149,6 +171,18 @@ export default function StoryPage() {
       
       await saveSettings()
       
+      // 👇 核心拼装逻辑：把外部导入的文件以特定的 Prompt 结构拼接到底层设定中
+      const finalSettings = { ...settings }
+      if (attachedFiles) {
+        Object.keys(finalSettings).forEach((key) => {
+          const k = key as keyof typeof attachedFiles;
+          if (attachedFiles[k]) {
+            // 如果某一项有附件，就在文本框内容后面追加附件的内容
+            finalSettings[k] += `\n\n【补充参考附件：${attachedFiles[k]?.name}】\n${attachedFiles[k]?.content}`
+          }
+        })
+      }
+
       setTypingChapter({ index: (chapters?.length || 0) + 1, title: '', content: '' })
       
       let partialTitle = '';
@@ -157,7 +191,7 @@ export default function StoryPage() {
       
       const result = await generateChapterStream(
         {
-          settings,
+          settings: finalSettings, // 🌟 这里一定要用 finalSettings 替换原来的 settings
           userConfig: config,
           contextSummary,
           chosenBranch,

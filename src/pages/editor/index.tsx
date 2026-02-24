@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { View, Text, Textarea, Button } from '@tarojs/components'
+import { View, Text, Textarea, Button, ScrollView } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import { useSettings } from '@/store/settings'
 import { polishText } from '@/services/polish'
 import { useUserConfig } from '@/store/userConfig'
 import type { SettingDocKey } from '@/types'
-// 🌟 1. 确保导入 SETTING_DOCS
 import { SETTING_DOCS, MAX_SETTING_CHARS, MAX_MD_FILE_BYTES } from '@/constants/settings'
 import './index.scss'
 
@@ -13,14 +12,19 @@ const KEYS: SettingDocKey[] = ['characters', 'worldview', 'scenes', 'mainPlot', 
 
 export default function EditorPage() {
   const router = useRouter()
-  const { settings, setOne, save } = useSettings()
+  // 🌟 解构出我们刚刚写的附件方法
+  const { settings, setOne, attachedFiles, setAttachedFile, save } = useSettings()
   const { config } = useUserConfig()
+  
   const key = (router.params.key || 'characters') as SettingDocKey
   const title = decodeURIComponent(router.params.title || '设定')
   const [value, setValue] = useState(settings[key] || '')
   const [polishing, setPolishing] = useState(false)
+  
+  // 🌟 全屏预览的状态控制
+  const [previewing, setPreviewing] = useState(false)
 
-  // 🌟 2. 动态获取当前设定项的专属 placeholder
+  const attachedFile = attachedFiles?.[key]
   const currentDoc = SETTING_DOCS.find(doc => doc.key === key)
   const placeholderText = currentDoc?.placeholder || '请输入内容...'
 
@@ -57,117 +61,77 @@ export default function EditorPage() {
     }
   }
 
+  // 🌟 全新的附件导入逻辑
   const handleChooseFile = async () => {
     try {
-      const res = await Taro.chooseMessageFile({
-        count: 1,
-        type: 'file',
-        extension: ['md', 'txt']
-      })
-
-      const file = res.tempFiles?.[0]
-      if (!file) {
-        Taro.showToast({ title: '未选择文件', icon: 'none' })
-        return
+      if (attachedFile) {
+        return Taro.showToast({ title: '每个设定只允许附加1个文档，请先删除现有文档', icon: 'none' })
       }
 
-      // 验证文件类型
+      const res = await Taro.chooseMessageFile({ count: 1, type: 'file', extension: ['md', 'txt'] })
+      const file = res.tempFiles?.[0]
+      if (!file) return
+
       const fileName = file.name.toLowerCase()
       if (!fileName.endsWith('.md') && !fileName.endsWith('.txt')) {
-        Taro.showToast({ title: '只支持 .md 和 .txt 格式的文件', icon: 'none' })
-        return
+        return Taro.showToast({ title: '只支持 .md 和 .txt 格式', icon: 'none' })
       }
 
-      // 验证文件大小
       if (file.size > MAX_MD_FILE_BYTES) {
-        Taro.showToast({ 
-          title: `文件大小不能超过 ${(MAX_MD_FILE_BYTES / 1024).toFixed(1)}KB`, 
-          icon: 'none' 
-        })
-        return
+        return Taro.showToast({ title: `文件不能超过 ${(MAX_MD_FILE_BYTES / 1024).toFixed(0)}KB`, icon: 'none' })
       }
+      if (file.size === 0) return Taro.showToast({ title: '文件为空', icon: 'none' })
 
-      if (file.size === 0) {
-        Taro.showToast({ title: '文件为空', icon: 'none' })
-        return
-      }
-
-      // 读取文件内容
       const fs = Taro.getFileSystemManager()
-      const readFileResult: any = await fs.readFile({
-        filePath: file.path,
-        encoding: 'utf-8'
-      })
+      const readFileResult: any = await fs.readFile({ filePath: file.path, encoding: 'utf-8' })
 
       let content = (readFileResult.data as string) || ''
-      
-      // 移除BOM标记
-      content = content.replace(/^\uFEFF/, '')
-      // 将多个连续空行（含空白）合并为单个换行
-      content = content.replace(/\n\s*\n\s*/g, '\n')
+      content = content.replace(/^\uFEFF/, '').replace(/\n\s*\n\s*/g, '\n')
       
       if (content) {
-        const sizeKB = (file.size / 1024).toFixed(1)
-        const fileType = fileName.endsWith('.md') ? 'Markdown' : '文本'
-        
-        setValue(prevValue => {
-          const newValue = prevValue ? prevValue + '\n\n' + content : content
-          const truncated = newValue.length > MAX_SETTING_CHARS
-          const finalValue = truncated ? newValue.slice(0, MAX_SETTING_CHARS) : newValue
-          
-          setTimeout(() => {
-            Taro.showToast({ 
-              title: truncated 
-                ? `已导入${fileType}文件 (${sizeKB}KB)，内容已截断` 
-                : `已导入${fileType}文件 (${sizeKB}KB)`, 
-              icon: 'success',
-              duration: 2000
-            })
-          }, 100)
-          
-          return finalValue
-        })
+        setAttachedFile(key, { name: file.name, content: content, size: file.size })
+        await save() // 立即落盘
+        Taro.showToast({ title: '附件导入成功', icon: 'success' })
       } else {
-        Taro.showToast({ title: '文件内容为空', icon: 'none' })
+        Taro.showToast({ title: '文件解析失败', icon: 'none' })
       }
     } catch (err: any) {
       if (err.errMsg?.includes('cancel')) return
-      console.error('文件处理错误:', err)
-      Taro.showToast({ title: '文件处理失败: ' + (err.message || '未知错误'), icon: 'none' })
+      Taro.showToast({ title: '文件处理失败', icon: 'none' })
     }
+  }
+
+  // 🌟 删除附件逻辑
+  const handleRemoveFile = async () => {
+    Taro.showModal({
+      title: '移除文档',
+      content: '确定要移除这个附加文档吗？',
+      confirmColor: '#ff6b6b',
+      success: async (res) => {
+        if (res.confirm) {
+          setAttachedFile(key, null)
+          await save()
+          Taro.showToast({ title: '已移除', icon: 'success' })
+        }
+      }
+    })
   }
 
   const handlePolish = async () => {
     const trimmed = value.trim()
-    if (!trimmed) {
-      Taro.showToast({ title: '请先输入要润色的内容', icon: 'none' })
-      return
-    }
-    
-    // 检查API配置
-    if (!config.apiKey?.trim()) {
-      Taro.showToast({ 
-        title: '请先在"AI模型配置"中填写API密钥', 
-        icon: 'none' 
-      })
-      return
-    }
+    if (!trimmed) return Taro.showToast({ title: '请先在输入框填写内容', icon: 'none' })
+    if (!config.apiKey?.trim()) return Taro.showToast({ title: '请先配置API密钥', icon: 'none' })
     
     setPolishing(true)
     try {
       Taro.showLoading({ title: 'AI正在精雕细琢...' })
-      // 把 key 传给后端，这样就能根据不同的设定类型（比如 characters）使用专属的润色 Prompt
       const result = await polishText(trimmed, key, config.apiKey)
       setValue(result)
-      Taro.hideLoading()
       Taro.showToast({ title: '润色完成', icon: 'success' })
     } catch (e) {
-      Taro.hideLoading()
-      Taro.showToast({ 
-        title: e instanceof Error ? e.message : '润色请求失败', 
-        icon: 'none' 
-      })
+      Taro.showToast({ title: e instanceof Error ? e.message : '请求失败', icon: 'none' })
     } finally {
+      Taro.hideLoading()
       setPolishing(false)
     }
   }
@@ -178,33 +142,60 @@ export default function EditorPage() {
         <Text>{title}</Text>
       </View>
       <View className="toolbar">
-        <Button plain className="toolbar-btn" size="mini" onClick={handlePasteFromClipboard}>
-          从剪贴板导入
-        </Button>
-        <Button plain className="toolbar-btn" size="mini" onClick={handleChooseFile}>
-          选择 MD/TXT 文件
-        </Button>
+        <Button plain className="toolbar-btn" size="mini" onClick={handlePasteFromClipboard}>从剪贴板粘贴</Button>
+        <Button plain className="toolbar-btn" size="mini" onClick={handleChooseFile}>导入外部文档</Button>
         <Button plain className="toolbar-btn polish" size="mini" onClick={handlePolish} disabled={polishing}>
           {polishing ? '润色中…' : 'AI 润色'}
         </Button>
       </View>
       
-      {/* 🌟 3. 使用动态读取的 placeholderText */}
-      <Textarea
-        className="textarea"
-        placeholder={placeholderText}
-        value={value}
-        maxlength={MAX_SETTING_CHARS}
-        onInput={(e) => setValue(String(e.detail.value).slice(0, MAX_SETTING_CHARS))}
-        autoHeight
-      />
+      {/* 🌟 核心容器：包含输入框与独立的文件展示卡片 */}
+      <View className="textarea-container">
+        {/* 微信原生组件防穿透保护：预览时暂时隐藏 Textarea */}
+        {!previewing && (
+          <Textarea
+            className="textarea"
+            placeholder={placeholderText}
+            value={value}
+            maxlength={MAX_SETTING_CHARS}
+            onInput={(e) => setValue(String(e.detail.value).slice(0, MAX_SETTING_CHARS))}
+          />
+        )}
+        
+        {/* 🌟 附件展示卡片 (类似文件夹) */}
+        {attachedFile && (
+          <View className="attached-file-card" onClick={() => setPreviewing(true)}>
+            <View className="file-info-left">
+              <Text className="file-icon">📄</Text>
+              <View className="file-details">
+                <Text className="file-name">{attachedFile.name}</Text>
+                <Text className="file-size">{(attachedFile.size / 1024).toFixed(1)} KB</Text>
+              </View>
+            </View>
+            <View className="file-remove" onClick={(e) => { e.stopPropagation(); handleRemoveFile(); }}>✕</View>
+          </View>
+        )}
+      </View>
 
-      {/* 🌟 4. 新增的固定提示区域 */}
       <View className="hint-text">
-        <Text>💡 支持 Markdown，可作为 AI 生成的参考依据；也可粘贴或导入外部 MD（本区最多 {MAX_SETTING_CHARS} 字）</Text>
+        <Text>💡 您可以手打设定内容，或在下方附加1个 {(MAX_MD_FILE_BYTES / 1024).toFixed(0)}KB 内的参考文档，在 AI 生成时会综合参考二者。</Text>
       </View>
 
       <Button className="btn-save" onClick={handleSave}>保存</Button>
+
+      {/* 🌟 独立的文档预览全屏遮罩 */}
+      {previewing && attachedFile && (
+        <View className="preview-modal">
+          <View className="preview-header">
+            <Text className="title">{attachedFile.name}</Text>
+            <Text className="close-btn" onClick={() => setPreviewing(false)}>关闭</Text>
+          </View>
+          <ScrollView scrollY className="preview-content">
+            {/* userSelect 允许长按复制内容 */}
+            <Text userSelect>{attachedFile.content}</Text>
+          </ScrollView>
+        </View>
+      )}
     </View>
   )
 }
