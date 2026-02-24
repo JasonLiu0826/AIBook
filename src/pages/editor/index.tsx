@@ -203,7 +203,7 @@ export default function EditorPage() {
       </View>
 
       <View className="hint-text">
-        <Text>💡 您可以手动输入内容，或在下方附加1个 {(MAX_MD_FILE_BYTES / 1024).toFixed(0)}KB 内的参考文档，在 AI 生成时会把二者综合参考。</Text>
+        <Text>💡 您务必手动输入内容（不能为空），可选：在下方附加1个 {(MAX_MD_FILE_BYTES / 1024).toFixed(0)}KB 内的参考文档，AI 生成内容时会把二者综合参考。</Text>
       </View>
 
       <Button className="btn-save" onClick={handleSave}>保存</Button>
