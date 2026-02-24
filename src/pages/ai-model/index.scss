@@ -88,8 +88,14 @@
   }
 }
 
+/* 🌟 修改 src/pages/ai-model/index.scss */
+
 .input-field {
-  padding: 24rpx;
+  width: 100%;             /* 确保填满父容器 */
+  height: 88rpx;           /* 🌟 给定明确的高度，符合 88rpx 触控标准 */
+  line-height: 88rpx;      /* 🌟 保证文字和光标垂直居中 */
+  padding: 0 24rpx;        /* 🌟 去掉上下内边距，只保留左右内边距 */
+  
   background: rgba(15, 15, 26, 0.8);
   border: 2rpx solid #2a2a4a;
   border-radius: 12rpx;
