@@ -103,3 +103,17 @@
     transition: all 0.1s ease;
   }
 }
+
+/* 追加在 index.scss 最下面 */
+
+.hint-text {
+  margin-top: 16rpx;
+  padding: 0 8rpx;
+  
+  text {
+    font-size: 24rpx;
+    color: #7a7a7a;
+    line-height: 1.5;
+    word-break: break-all;
+  }
+}
