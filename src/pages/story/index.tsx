@@ -540,7 +540,18 @@ export default function StoryPage() {
               <Button className="action-btn" size="mini" onClick={() => { triggerVibrate('medium'); setShowMenu(false); Taro.showModal({ title: '重新开始', content: '确定清空并重新开始吗？', confirmColor: '#d9534f', success: (res) => { if (res.confirm) { resetStory(); Taro.showToast({ title: '已清空', icon: 'success' }) } } }) }}>🔄 重启</Button>
             </>
           )}
-          <Button className="action-btn primary" size="mini" onClick={() => { triggerVibrate('medium'); Taro.redirectTo({ url: '/pages/story-list/index' }) }}>📚 故事列表</Button>
+          <Button className="action-btn primary" size="mini" onClick={() => { 
+            triggerVibrate('medium'); 
+            // 🌟 核心逻辑更正：
+            // 检查当前页面栈，如果是从列表页跳过来的，则直接返回，避免堆叠
+            const pages = Taro.getCurrentPages();
+            if (pages.length > 1) {
+              Taro.navigateBack();
+            } else {
+              // 如果是直接打开的故事页（无上级页面），则重定向到列表
+              Taro.reLaunch({ url: '/pages/story-list/index' });
+            }
+          }}>📚 故事列表</Button>
         </View>
       </View>
 
