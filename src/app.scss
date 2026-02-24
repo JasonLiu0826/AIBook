@@ -1,4 +1,9 @@
 /* app.scss - 企业级设计系统Token */
+/* ✅ 微信小程序专属的盒模型重置写法 */
+page, view, scroll-view, swiper, swiper-item, text, image, input, button, navigator, textarea, form, label {
+  box-sizing: border-box;
+}
+
 :root, page {
   /* 调色板 Palette */
   --color-primary: #4a7c59;

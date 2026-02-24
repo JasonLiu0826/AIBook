@@ -1,6 +1,6 @@
 .page-story {
   height: 100vh;       /* 🌟 1. 改为绝对固定高度，不能是 min-height */
-  width: 100vw;
+  width: 100%;           /* 🌟 把 100vw 改为 100% */
   max-width: 600px;    /* 🌟 企业级优化：限制最大宽度，适配折叠屏和平板 */
   margin: 0 auto;      /* 🌟 居中显示，防止大屏设备UI拉伸 */
   overflow: hidden;    /* 🌟 2. 彻底锁死整个页面的原生滑动 */
@@ -331,10 +331,12 @@
 .footer-container {
   position: fixed;
   bottom: 0;
-  left: 50%;                     /* 🌟 企业级优化：配合max-width居中 */
-  transform: translateX(-50%);   /* 🌟 确保在限定宽度内居中 */
+  left: 0;               /* 🌟 直接归零 */
+  right: 0;              /* 🌟 直接归零 */
+  margin: 0 auto;        /* 🌟 利用 margin 完美居中 */
   width: 100%;
   max-width: 600px;              /* 🌟 与.page-story保持一致 */
+  /* 删除 transform: translateX(-50%); */
   background: rgba(15, 15, 26, 0.95);
   border-top: 1rpx solid var(--color-border);
   backdrop-filter: blur(20rpx);
@@ -489,10 +491,12 @@
 .footer {
   position: fixed;
   bottom: 0;
-  left: 50%;                     /* 🌟 企业级优化：配合max-width居中 */
-  transform: translateX(-50%);   /* 🌟 确保在限定宽度内居中 */
+  left: 0;               /* 🌟 直接归零 */
+  right: 0;              /* 🌟 直接归零 */
+  margin: 0 auto;        /* 🌟 利用 margin 完美居中 */
   width: 100%;
   max-width: 600px;              /* 🌟 与.page-story保持一致 */
+  /* 删除 transform: translateX(-50%); */
   padding: var(--spacing-sm) var(--spacing-base);
   background: linear-gradient(to top, var(--color-bg-base) 0%, rgba(15, 15, 26, 0.95) 100%);
   border-top: 1rpx solid var(--color-border);
