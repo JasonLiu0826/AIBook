@@ -29,6 +29,12 @@
       border-radius: 20px;
       font-weight: 500;
       &::after { display: none; }
+
+      // 视觉上的禁用效果
+      &.btn-disabled-visual {
+        opacity: 0.5;
+        background-color: #ccc !important;
+      }
     }
   }
 
@@ -128,6 +134,14 @@
         &:active { opacity: 0.8; }
       }
     }
+
+    // 底部引流提示
+    .more-hint {
+      text-align: center;
+      font-size: 12px;
+      color: #999;
+      padding: 15px 0;
+    }
   }
 
   // 弹窗遮罩层
@@ -136,9 +150,12 @@
     top: 0; left: 0; right: 0; bottom: 0;
     background-color: rgba(0,0,0,0.5);
     display: flex;
-    align-items: center;
     justify-content: center;
     z-index: 999;
+
+    /* 🌟 修改这里：从居中对齐改为靠上对齐，并距离顶部 20vh，防止键盘遮挡 */
+    align-items: flex-start; 
+    padding-top: 20vh; 
 
     .modal-content {
       width: 75%;
@@ -152,8 +169,6 @@
         font-weight: bold;
         text-align: center;
         margin-bottom: 20px;
-        
-        /* 👇 修改这里：把原本的 #333 改成企业级亮色变量 #e8e8e8 */
         color: #e8e8e8; 
       }
 
@@ -163,8 +178,6 @@
         border-radius: 8px;
         margin-bottom: 24px;
         font-size: 16px;
-        
-        /* 👇 重点替换：删掉原来的 padding: 12px; 改用固定高度 + 仅左右内边距 */
         height: 88rpx;
         line-height: 88rpx;
         padding: 0 24rpx;
@@ -195,6 +208,7 @@
   }
 }
 
+// 🌟 修改入场动画：保持简单的缩放弹出，不再带有 translateY 偏移，避免出现闪烁
 @keyframes popIn {
   from { transform: scale(0.9); opacity: 0; }
   to { transform: scale(1); opacity: 1; }

@@ -440,7 +440,7 @@ export default function StoryPage() {
       <ScrollView scrollY className="scroll" scrollTop={scrollTop} scrollWithAnimation={!generating} onScroll={onScroll}>
         {!apiConfigured && (!chapters || chapters.length === 0) && (
           <View className="api-tip">
-            <Text>💡 温馨提示：您尚未配置AI生成接口，系统将为您展示精彩的故事示例。配置后端接口后即可享受完整的AI创作体验！</Text>
+            <Text> 温馨提示：您尚未进行AI模型配置，配置后即可享受完整的AI创作体验！</Text>
           </View>
         )}
         

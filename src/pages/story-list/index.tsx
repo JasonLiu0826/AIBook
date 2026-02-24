@@ -5,7 +5,6 @@ import { useStory } from '@/store/story'
 import './index.scss'
 
 export default function StoryListPage() {
-  // 🌟【防崩溃 1】为所有从 useStory 解构出来的值提供后备保护，防止 Provider 未挂载导致 undefined
   const { 
     storyList = [], 
     createStory, 
@@ -25,7 +24,19 @@ export default function StoryListPage() {
   const [renameTargetId, setRenameTargetId] = useState('')
   const [renameInput, setRenameInput] = useState('')
 
+  // 数量超限弹窗状态
+  const [limitModalVisible, setLimitModalVisible] = useState(false)
+
+  // 强制验证 storyList 必须是一个数组
+  const safeStoryList = Array.isArray(storyList) ? storyList : []
+
   const handleCreate = () => {
+    // 🌟 核心拦截：最多只能有 5 个故事，如果满 5 个则弹出我们新增的弹窗
+    if (safeStoryList.length >= 5) {
+      setLimitModalVisible(true)
+      return
+    }
+
     if (createStory) {
       createStory()
       Taro.navigateTo({ url: '/pages/story/index' })
@@ -34,7 +45,6 @@ export default function StoryListPage() {
 
   const handleSelect = async (id: string) => {
     if (!id) return
-    // 如果在侧滑状态点击卡片本身，先收起侧滑菜单
     if (swipeId === id) {
       setSwipeId('') 
       return
@@ -45,7 +55,6 @@ export default function StoryListPage() {
     }
   }
 
-  // 侧滑判定逻辑
   const handleTouchStart = (e: any) => {
     if (!e.touches || !e.touches[0]) return
     touchStartX.current = e.touches[0].clientX
@@ -59,7 +68,6 @@ export default function StoryListPage() {
     const deltaX = touchX - touchStartX.current
     const deltaY = Math.abs(touchY - touchStartY.current)
     
-    // 如果上下滑动幅度大于左右滑动，说明用户在滚动列表，忽略操作
     if (deltaY > Math.abs(deltaX)) return
     
     if (deltaX < -30) {
@@ -105,7 +113,6 @@ export default function StoryListPage() {
     }
   }
 
-  // 🌟【防崩溃 2】对时间戳进行 NaN 防御，防止报错
   const formatDate = (ts?: number) => {
     if (!ts) return '未知时间'
     const d = new Date(ts)
@@ -113,14 +120,18 @@ export default function StoryListPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
-  // 🌟【防崩溃 3】强制验证 storyList 必须是一个数组，哪怕缓存穿透了也不会白屏
-  const safeStoryList = Array.isArray(storyList) ? storyList : []
-
   return (
     <View className="page-story-list">
       <View className="header">
         <Text className="title">我的故事</Text>
-        <Button className="btn-new" size="mini" onClick={handleCreate}>+ 新建故事</Button>
+        <Button 
+          className={`btn-new ${safeStoryList.length >= 5 ? 'btn-disabled-visual' : ''}`} 
+          size="mini" 
+          onClick={handleCreate}
+          // 删除了原先的 disabled 属性，保证点击事件能正常触发
+        >
+          + 新建故事
+        </Button>
       </View>
 
       <ScrollView scrollY className="list">
@@ -128,7 +139,6 @@ export default function StoryListPage() {
           <View className="empty">暂无故事，点击右上角新建</View>
         ) : (
           safeStoryList.map((story, index) => {
-            // 🌟【防崩溃 4】过滤掉数组中可能存在的 null 或 空对象
             if (!story || !story.id) return null
 
             return (
@@ -163,6 +173,11 @@ export default function StoryListPage() {
             )
           })
         )}
+        
+        {/* 底部引流提示 */}
+        <View className="more-hint" style={{ textAlign: 'center', fontSize: '12px', color: '#999', padding: '15px 0' }}>
+          <Text>若想体验更多故事，请浏览网页端或下载App</Text>
+        </View>
       </ScrollView>
 
       {/* 重命名弹窗 */}
@@ -179,6 +194,18 @@ export default function StoryListPage() {
             <View className="modal-btns">
               <Button className="btn cancel" onClick={() => setRenameModalVisible(false)}>取消</Button>
               <Button className="btn confirm" onClick={confirmRename}>确认</Button>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* 数量超限弹窗 */}
+      {limitModalVisible && (
+        <View className="modal-overlay" onClick={() => setLimitModalVisible(false)}>
+          <View className="modal-content" onClick={e => e.stopPropagation()}>
+            <View className="modal-title" style={{ textAlign: 'center', margin: '20px 0', fontSize: '16px' }}>抱歉，您的书架已满~</View>
+            <View className="modal-btns">
+              <Button className="btn confirm" style={{ width: '100%' }} onClick={() => setLimitModalVisible(false)}>我知道了</Button>
             </View>
           </View>
         </View>
