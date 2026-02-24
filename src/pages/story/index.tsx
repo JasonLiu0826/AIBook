@@ -5,6 +5,7 @@ import { useSettings } from '@/store/settings'
 import { useUserConfig } from '@/store/userConfig'
 import { useStory } from '@/store/story'
 import { generateChapterStream, isGenerateApiConfigured, getMockFirstChapter, summarizeChapterNode } from '@/services/ai'
+import { getAdaptivePaddingBottom } from '@/utils/system'
 import type { Chapter, BranchOption } from '@/types'
 import './index.scss'
 
@@ -401,7 +402,10 @@ export default function StoryPage() {
         {error && <Text className="err">{error}</Text>}
       </ScrollView>
 
-      <View className="footer-container">
+      <View 
+        className="footer-container" 
+        style={{ paddingBottom: getAdaptivePaddingBottom(24) }}
+      >
         <View className="custom-input-row">
           {lastChapter && lastChapter?.branches?.length > 0 && !lastChapter.selectedBranch && !generating ? (
             <>

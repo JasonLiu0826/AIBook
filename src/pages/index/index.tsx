@@ -39,10 +39,9 @@ const MENU_CONFIG: MenuItem[] = [
 ]
 
 // 单个菜单项组件
-const MenuItemComponent = ({ item, index }: { item: MenuItem; index: number }) => {
+const MenuItemComponent = ({ item }: { item: MenuItem }) => {
   return (
     <Navigator 
-      key={index} 
       url={item.url} 
       className={`item ${item.type}`}
       hoverClass="item-hover" // 增加通用的点击按压态类
@@ -63,7 +62,7 @@ export default function Index() {
       </View>
       <View className="menu">
         {MENU_CONFIG.map((item, index) => (
-          <MenuItemComponent key={index} item={item} index={index} />
+          <MenuItemComponent key={index} item={item} />
         ))}
       </View>
     </View>
