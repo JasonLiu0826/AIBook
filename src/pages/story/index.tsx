@@ -92,10 +92,39 @@ ${ch?.content || ''}
   return md;
 }
 
+// 🌟 1. 高级选项嗅探器 (Sentinel Detector)
+// 用于在 AI 流式输出时，提前发现选项的苗头，并返回截断索引
+function findOptionStartIndex(text: string): number | null {
+  if (!text || text.length < 30) return null; // 避免文章开头误伤
+  
+  // 寻找引导语 (抛弃结尾 $ 限制，只要出现就算)
+  const guideReg = /(?:^|\n|\s{2,}|[。！？\.\!\?”」]\s*)(?:请选择|下一步|分支选项|选项|剧情分支|你的选择|你决定|你会|请决定|接下来|(?:你)?可以选择)(?:[：:\s])/i;
+  const guideMatch = text.match(guideReg);
+  let idx1 = guideMatch && guideMatch.index !== undefined && guideMatch.index > text.length * 0.3 
+    ? guideMatch.index + (/^[。！？\.\!\?”」]/.test(guideMatch[0]) ? 1 : 0) : null;
+
+  // 寻找选项列表 (如 A. / 1. / ①)
+  const listReg = /(?:^|\n|\s{2,}|[。！？\.\!\?”」]\s*)(?:\*\*?)?(?:选项)?(?:[A-Da-d]|[1-4]|[①-④])(?:\*\*?)?[\.、：:\)）]/i;
+  const listMatch = text.match(listReg);
+  let idx2 = listMatch && listMatch.index !== undefined && listMatch.index > text.length * 0.3
+    ? listMatch.index + (/^[。！？\.\!\?”」]/.test(listMatch[0]) ? 1 : 0) : null;
+    
+  if (idx1 !== null && idx2 !== null) return Math.min(idx1, idx2);
+  return idx1 !== null ? idx1 : idx2;
+}
+
+// 🌟 2. 保留给历史记录和最终入库洗白用的包裹函数
+function cleanChapterContent(text: string): string {
+  const idx = findOptionStartIndex(text);
+  return idx !== null ? text.slice(0, idx).trim() : text.trim();
+}
+
 export default function StoryPage() {
   const { settings, attachedFiles, save: saveSettings } = useSettings()
-  // 🌟 核心修复：整个组件内部只保留这一次 config 声明
   const { config } = useUserConfig()
+  
+  // 🌟 新增：记录选项开始的位置，用于永久冻结后续正文的渲染
+  const optionStartIndexRef = useRef<number | null>(null);
   
   // 🌟 1. 通用震动辅助函数
   const triggerVibrate = useCallback((type: 'light' | 'medium' | 'heavy' = 'medium') => {
@@ -159,6 +188,7 @@ export default function StoryPage() {
     setError('')
     setShowSuccess(false)
     setGenerating(true)
+    optionStartIndexRef.current = null; // 🌟 每次生成前强制重置冻结标记
     let loadingShown = false
     let errorToast: { title: string; icon: 'none' | 'success', duration: number } | null = null
     
@@ -211,13 +241,33 @@ export default function StoryPage() {
               break;
             case 'content':
               partialContent += partialData.value;
-              setTypingChapter(prev => prev ? { ...prev, content: partialContent } : null)
+              
+              // ⭐ 终极优化：选项嗅探器 (Sentinel Detector)
+              // 实时监测，一旦发现选项苗头，立刻锁死当前索引
+              if (optionStartIndexRef.current === null) {
+                const startIdx = findOptionStartIndex(partialContent);
+                if (startIdx !== null) {
+                  optionStartIndexRef.current = startIdx;
+                }
+              }
+
+              // ⭐ 结构驱动渲染：只要被标记冻结了，后面的内容再多也绝不渲染
+              let display = partialContent;
+              if (optionStartIndexRef.current !== null) {
+                display = partialContent.slice(0, optionStartIndexRef.current);
+              }
+
+              setTypingChapter(prev => prev ? { ...prev, content: display.trim() } : null)
               smartAutoScroll()
-              vibrateTyping() // 👈 触发打字震动
+              vibrateTyping() 
               break;
             case 'branches':
               try { 
                 partialBranches = JSON.parse(partialData.value);
+                // ⭐ 语义截断兜底：哪怕嗅探器漏掉了，收到 branches 信号立刻冻结渲染
+                if (optionStartIndexRef.current === null) {
+                  optionStartIndexRef.current = partialContent.length;
+                }
                 console.log('✅ 成功解析分支数据:', partialBranches);
               } catch (e) {
                 console.error('❌ 分支数据解析失败:', partialData.value, e);
@@ -246,7 +296,10 @@ export default function StoryPage() {
         id: genId(),
         index: (chapters?.length || 0) + 1,
         title: result.title,
-        content: result.content,
+        // 🌟 最终存入记录时，严格应用冻结索引截断，防止脏数据入库
+        content: optionStartIndexRef.current !== null 
+          ? result.content.slice(0, optionStartIndexRef.current).trim() 
+          : cleanChapterContent(result.content), // 👈 存入极其干净的正文
         branches: finalBranchesArray.map((text: string, i: number) => ({ 
           id: `b_${i}`, 
           text, 
