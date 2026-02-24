@@ -5,7 +5,8 @@ import { useSettings } from '@/store/settings'
 import { polishText } from '@/services/polish'
 import { useUserConfig } from '@/store/userConfig'
 import type { SettingDocKey } from '@/types'
-import { MAX_SETTING_CHARS, MAX_MD_FILE_BYTES } from '@/constants/settings'
+// 🌟 1. 确保导入 SETTING_DOCS
+import { SETTING_DOCS, MAX_SETTING_CHARS, MAX_MD_FILE_BYTES } from '@/constants/settings'
 import './index.scss'
 
 const KEYS: SettingDocKey[] = ['characters', 'worldview', 'scenes', 'mainPlot', 'storyNodes']
@@ -18,6 +19,10 @@ export default function EditorPage() {
   const title = decodeURIComponent(router.params.title || '设定')
   const [value, setValue] = useState(settings[key] || '')
   const [polishing, setPolishing] = useState(false)
+
+  // 🌟 2. 动态获取当前设定项的专属 placeholder
+  const currentDoc = SETTING_DOCS.find(doc => doc.key === key)
+  const placeholderText = currentDoc?.placeholder || '请输入内容...'
 
   useEffect(() => {
     if (KEYS.includes(key)) {
@@ -98,12 +103,10 @@ export default function EditorPage() {
       
       // 移除BOM标记
       content = content.replace(/^\uFEFF/, '')
-      
       // 将多个连续空行（含空白）合并为单个换行
       content = content.replace(/\n\s*\n\s*/g, '\n')
       
       if (content) {
-        // 显示文件信息
         const sizeKB = (file.size / 1024).toFixed(1)
         const fileType = fileName.endsWith('.md') ? 'Markdown' : '文本'
         
@@ -112,7 +115,6 @@ export default function EditorPage() {
           const truncated = newValue.length > MAX_SETTING_CHARS
           const finalValue = truncated ? newValue.slice(0, MAX_SETTING_CHARS) : newValue
           
-          // 显示导入结果
           setTimeout(() => {
             Taro.showToast({ 
               title: truncated 
@@ -154,7 +156,8 @@ export default function EditorPage() {
     setPolishing(true)
     try {
       Taro.showLoading({ title: 'AI正在精雕细琢...' })
-      const result = await polishText(trimmed, title, config.apiKey)
+      // 把 key 传给后端，这样就能根据不同的设定类型（比如 characters）使用专属的润色 Prompt
+      const result = await polishText(trimmed, key, config.apiKey)
       setValue(result)
       Taro.hideLoading()
       Taro.showToast({ title: '润色完成', icon: 'success' })
@@ -185,14 +188,22 @@ export default function EditorPage() {
           {polishing ? '润色中…' : 'AI 润色'}
         </Button>
       </View>
+      
+      {/* 🌟 3. 使用动态读取的 placeholderText */}
       <Textarea
         className="textarea"
-        placeholder="支持 Markdown，可作为 AI 生成的参考依据；也可粘贴或导入外部 MD（本区最多 1000 字）"
+        placeholder={placeholderText}
         value={value}
         maxlength={MAX_SETTING_CHARS}
         onInput={(e) => setValue(String(e.detail.value).slice(0, MAX_SETTING_CHARS))}
         autoHeight
       />
+
+      {/* 🌟 4. 新增的固定提示区域 */}
+      <View className="hint-text">
+        <Text>💡 支持 Markdown，可作为 AI 生成的参考依据；也可粘贴或导入外部 MD（本区最多 {MAX_SETTING_CHARS} 字）</Text>
+      </View>
+
       <Button className="btn-save" onClick={handleSave}>保存</Button>
     </View>
   )

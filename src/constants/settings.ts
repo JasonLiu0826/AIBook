@@ -1,3 +1,11 @@
+/*
+ * @Author: jason 1917869590@qq.com
+ * @Date: 2026-02-21 01:42:19
+ * @LastEditors: jason 1917869590@qq.com
+ * @LastEditTime: 2026-02-24 17:11:29
+ * @FilePath: \AIBook_React_TypeScript\src\constants\settings.ts
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 import type { SettingDocMeta } from '@/types'
 
 export const SETTING_DOCS: SettingDocMeta[] = [
@@ -5,7 +13,7 @@ export const SETTING_DOCS: SettingDocMeta[] = [
   { key: 'worldview', title: '故事背景与世界观', placeholder: '时代、地点、规则、势力等…' },
   { key: 'scenes', title: '环境与场景设定', placeholder: '常用场景、氛围、细节…' },
   { key: 'mainPlot', title: '故事主线设定', placeholder: '主线目标、冲突、大事件…' },
-  { key: 'storyNodes', title: '重要故事节点更新', placeholder: '随剧情更新重要节点…' }
+  { key: 'storyNodes', title: '重要故事节点更新', placeholder: '随剧情更新重要节点…（无需填写，AI会实时更新）' }
 ]
 
 export const STORAGE_KEYS = {
