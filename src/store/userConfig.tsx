@@ -1,11 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
-import type { UserConfigState, NarrativePOV } from '@/types'
+import type { UserConfigState, NarrativePOV, NarrativePerspective } from '@/types'
 import { STORAGE_KEYS } from '@/constants/settings'
 
 const defaultUserConfig: UserConfigState = {
   singleOutputLength: 800,
   pov: 'third',
+  perspective: 'omniscient',   // 🌟 默认上帝视角
+  specificCharacterName: '',   // 🌟 默认名字为空
   aiProvider: 'mock',
   apiKey: '',
   customApiUrl: ''
@@ -17,6 +19,9 @@ type UserConfigContextValue = {
   setPOV: (pov: NarrativePOV) => void
   setSingleOutputLength: (n: number) => void
   setEnableVibration: (enabled: boolean) => void
+  // ... 保留原有方法 ...
+  setPerspective: (p: NarrativePerspective) => void
+  setSpecificCharacterName: (name: string) => void
   load: () => Promise<void>
   save: () => Promise<void>
 }
@@ -66,12 +71,23 @@ export function UserConfigProvider({ children }: { children: React.ReactNode }) 
     setConfigState(c => ({ ...c, enableVibration }))
   }, [])
 
+  const setPerspective = useCallback((perspective: NarrativePerspective) => {
+    setConfigState(c => ({ ...c, perspective }))
+  }, [])
+
+  const setSpecificCharacterName = useCallback((specificCharacterName: string) => {
+    setConfigState(c => ({ ...c, specificCharacterName }))
+  }, [])
+
   const value: UserConfigContextValue = {
     config,
     setConfig,
     setPOV,
     setSingleOutputLength,
     setEnableVibration,
+    // ... 导出原有方法 ...
+    setPerspective,
+    setSpecificCharacterName,
     load,
     save
   }

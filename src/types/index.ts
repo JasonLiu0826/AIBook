@@ -13,8 +13,11 @@ export interface SettingDocMeta {
   placeholder?: string
 }
 
-/** 人称：第一/第二/第三人称 */
-export type NarrativePOV = 'first' | 'second' | 'third'
+// 1. 人称回归本质
+export type NarrativePOV = 'first' | 'second' | 'third' | 'third_it'
+
+// 2. 🌟 新增：独立的叙事视角枚举
+export type NarrativePerspective = 'omniscient' | 'specific'
 
 /** 用户配置（单次输出字数、人称等） */
 export interface UserConfigState {
@@ -22,6 +25,9 @@ export interface UserConfigState {
   singleOutputLength: number
   /** 书写人称 */
   pov: NarrativePOV
+  // 3. 🌟 新增配置字段
+  perspective?: NarrativePerspective 
+  specificCharacterName?: string
   /** AI模型提供商 */
   aiProvider: 'mock' | 'deepseek' | 'openai' | 'custom'
   /** API密钥 */
