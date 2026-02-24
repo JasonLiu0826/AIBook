@@ -42,14 +42,25 @@ app.post('/generate/stream', async (req, res) => {
     if (contextSummary) prompt += `【前情提要】：\n${contextSummary}\n`;
     if (chosenBranch) prompt += `【本章走向】：主角在上一章结尾选择了——"${chosenBranch}"，请顺着这个选择往下写。\n`;
     
-    const povMap = { 'first': '第一人称(我)', 'second': '第二人称(你)', 'third': '第三人称(他/她)' };
-    const pov = povMap[userConfig?.pov] || '第三人称';
+    // 🌟 处理人称
+    const povMap = { 'first': '第一人称(我)', 'second': '第二人称(你)', 'third': '第三人称(他/她)', 'third_it': '第三人称(它)' };
+    const pov = povMap[userConfig?.pov] || '第三人称(他/她)';
 
-    // 强制 AI 按规定格式输出（特别是分支选项）
-    prompt += `\n【重要要求】：
-1. 请直接输出小说正文，严禁输出任何多余的客套话或分析解释。
-2. 视角必须使用 ${pov}。字数控制在 ${userConfig?.singleOutputLength || 800} 字左右。
-3. 在正文最后，你必须为主角设计3个不同的行动选项作为下一章的分支。请严格以 "选项A：XXX|选项B：XXX|选项C：XXX" 的单行格式放在整篇文末，不要带换行，方便程序提取。`;
+    // 🌟 处理视角镜头
+    let perspectiveInstruction = '';
+    if (userConfig?.perspective === 'omniscient' || !userConfig?.perspective) {
+      perspectiveInstruction = '【上帝视角(全知全能镜头)】：你可以洞察所有角色的内心、动机和未发生的事件。请根据剧情焦点的变化，灵活切换镜头，展现多线并行的宏大叙事。';
+    } else if (userConfig?.perspective === 'specific') {
+      const charName = userConfig?.specificCharacterName || '主角';
+      perspectiveInstruction = `【特定角色视角(限知沉浸镜头)】：请严格将摄像机和心理活动锁定在角色"${charName}"身上！你只能描写"${charName}"亲眼所见、亲耳所闻的事物及其内心活动。绝对不可以直接描写其他角色的心理，只能通过"${charName}"的观察和猜测来体现。`;
+    }
+
+    // 🌟 合体爆发出强大的 Prompt 制约
+    prompt += `\n【核心创作铁律】：
+1. 视角双重锁定：必须使用 ${pov} 结合 ${perspectiveInstruction} 进行创作。绝对不可违背此限制跨越视角描写。
+2. 请直接输出小说正文，严禁输出任何多余的客套话或剧情分析。
+3. 字数控制在 ${userConfig?.singleOutputLength || 800} 字左右。
+4. 在正文最后，你必须为当前主视角设计3个不同的行动选项作为下一章的分支。严格以 "选项A：XXX|选项B：XXX|选项C：XXX" 的单行格式放在整篇文末，不要带换行。`;
 
     // 4. 初始化 DeepSeek 客户端 (通过更换 baseURL 连入国内 DeepSeek)
     const openai = new OpenAI({
