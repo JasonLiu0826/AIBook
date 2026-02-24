@@ -131,6 +131,7 @@
   animation: fadeIn 0.2s ease-out;
   
   .preview-header {
+    flex-shrink: 0; /* 🌟 修复点1：防止标题栏被挤压 */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -157,15 +158,21 @@
   
   .preview-content {
     flex: 1;
-    padding: 40rpx;
-    box-sizing: border-box;
+    height: 0; /* 🌟 修复点2：极其关键！强行限制 ScrollView 高度，激活内部滚动 */
+    width: 100%;
     
-    text {
-      color: #d1d1d1;
-      font-size: 28rpx;
-      line-height: 1.8;
-      word-break: break-all;
-      white-space: pre-wrap;
+    .preview-text-container {
+      padding: 40rpx;
+      padding-bottom: 120rpx; /* 🌟 修复点3：底部留出足够空间，防止最后一行字贴边 */
+      box-sizing: border-box;
+      
+      text {
+        color: #d1d1d1;
+        font-size: 28rpx;
+        line-height: 1.8;
+        word-break: break-all;
+        white-space: pre-wrap;
+      }
     }
   }
 }

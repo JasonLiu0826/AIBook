@@ -61,7 +61,7 @@ export default function EditorPage() {
     }
   }
 
-  // 🌟 全新的附件导入逻辑
+  // 🌟 修复后的附件导入逻辑
   const handleChooseFile = async () => {
     try {
       if (attachedFile) {
@@ -72,7 +72,8 @@ export default function EditorPage() {
       const file = res.tempFiles?.[0]
       if (!file) return
 
-      const fileName = file.name.toLowerCase()
+      // 增加安全回退，防止某些机型取不到文件名
+      const fileName = (file.name || '未命名').toLowerCase()
       if (!fileName.endsWith('.md') && !fileName.endsWith('.txt')) {
         return Taro.showToast({ title: '只支持 .md 和 .txt 格式', icon: 'none' })
       }
@@ -82,22 +83,46 @@ export default function EditorPage() {
       }
       if (file.size === 0) return Taro.showToast({ title: '文件为空', icon: 'none' })
 
-      const fs = Taro.getFileSystemManager()
-      const readFileResult: any = await fs.readFile({ filePath: file.path, encoding: 'utf-8' })
+      Taro.showLoading({ title: '正在解析文件...' })
 
-      let content = (readFileResult.data as string) || ''
-      content = content.replace(/^\uFEFF/, '').replace(/\n\s*\n\s*/g, '\n')
+      // 🌟 核心修复点：将微信原生的回调函数手动包装成 Promise，强制程序等待文件读取完毕
+      const fileContent = await new Promise<string>((resolve, reject) => {
+        const fs = Taro.getFileSystemManager()
+        fs.readFile({
+          filePath: file.path,
+          encoding: 'utf-8',
+          success: (readRes) => resolve((readRes.data as string) || ''),
+          fail: (err) => reject(new Error(err.errMsg || '底层文件读取失败'))
+        })
+      })
+
+      // 文本清理：移除隐藏的BOM字符，清理多余的连行
+      let content = fileContent.replace(/^\uFEFF/, '').replace(/\n\s*\n\s*/g, '\n')
       
+      Taro.hideLoading()
+
       if (content) {
         setAttachedFile(key, { name: file.name, content: content, size: file.size })
-        await save() // 立即落盘
+        await save() // 立即保存到本地缓存
         Taro.showToast({ title: '附件导入成功', icon: 'success' })
       } else {
-        Taro.showToast({ title: '文件解析失败', icon: 'none' })
+        Taro.showToast({ title: '文件解析后内容为空', icon: 'none' })
       }
+      
     } catch (err: any) {
-      if (err.errMsg?.includes('cancel')) return
-      Taro.showToast({ title: '文件处理失败', icon: 'none' })
+      Taro.hideLoading()
+      // 如果用户主动取消选择，不做任何提示
+      if (err?.errMsg?.includes('cancel')) return 
+      
+      console.error('文件处理报错详细信息：', err)
+      
+      // 🌟 增强错误提示，把真正的错误原因弹出来，而不是统称失败
+      const errorMsg = err?.message || err?.errMsg || '未知错误'
+      Taro.showToast({ 
+        title: `导入失败: ${errorMsg}`, 
+        icon: 'none', 
+        duration: 3000 
+      })
     }
   }
 
@@ -178,7 +203,7 @@ export default function EditorPage() {
       </View>
 
       <View className="hint-text">
-        <Text>💡 您可以手打设定内容，或在下方附加1个 {(MAX_MD_FILE_BYTES / 1024).toFixed(0)}KB 内的参考文档，在 AI 生成时会综合参考二者。</Text>
+        <Text>💡 您可以手动输入内容，或在下方附加1个 {(MAX_MD_FILE_BYTES / 1024).toFixed(0)}KB 内的参考文档，在 AI 生成时会把二者综合参考。</Text>
       </View>
 
       <Button className="btn-save" onClick={handleSave}>保存</Button>
@@ -191,8 +216,10 @@ export default function EditorPage() {
             <Text className="close-btn" onClick={() => setPreviewing(false)}>关闭</Text>
           </View>
           <ScrollView scrollY className="preview-content">
-            {/* userSelect 允许长按复制内容 */}
-            <Text userSelect>{attachedFile.content}</Text>
+            {/* 🌟 新增这一层 View 包裹文本 */}
+            <View className="preview-text-container">
+              <Text userSelect>{attachedFile.content}</Text>
+            </View>
           </ScrollView>
         </View>
       )}
