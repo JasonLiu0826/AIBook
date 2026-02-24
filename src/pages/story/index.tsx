@@ -113,10 +113,19 @@ function findOptionStartIndex(text: string): number | null {
   return idx1 !== null ? idx1 : idx2;
 }
 
-// 🌟 2. 保留给历史记录和最终入库洗白用的包裹函数
+// 🌟 新增：拦截大模型喜欢输出的【全知视角】、【环境描写】等元数据结构标记
+function filterAIMetaText(text: string): string {
+  if (!text) return '';
+  // 匹配并删除带有特殊写作解析的【】内容，避免污染正文
+  return text.replace(/【[^】]*(视角|描写|转场|切换|解析|心理|旁白|分析|画外音|特写|镜头|提示|说明)[^】]*】/g, '');
+}
+
+// 🌟 修改：保留给历史记录和最终入库洗白用的包裹函数
 function cleanChapterContent(text: string): string {
   const idx = findOptionStartIndex(text);
-  return idx !== null ? text.slice(0, idx).trim() : text.trim();
+  let res = idx !== null ? text.slice(0, idx) : text;
+  // 在入库前彻底抹除元数据
+  return filterAIMetaText(res).trim();
 }
 
 export default function StoryPage() {
@@ -256,6 +265,9 @@ export default function StoryPage() {
               if (optionStartIndexRef.current !== null) {
                 display = partialContent.slice(0, optionStartIndexRef.current);
               }
+
+              // 👇 🌟 新增这一行：在打字机预览时，实时静音【全知视角】这类元文字
+              display = filterAIMetaText(display);
 
               setTypingChapter(prev => prev ? { ...prev, content: display.trim() } : null)
               smartAutoScroll()
@@ -440,7 +452,8 @@ export default function StoryPage() {
             <View key={ch?.id || i} className="chapter">
               <Text className="chapter-index">第 {ch?.index || i + 1} 章</Text>
               <Text className="chapter-title">{ch?.title}</Text>
-              <Text className="chapter-content">{ch?.content}</Text>
+              {/* 👇 🌟 修改这一行：让以前生成的带着【】的旧记录也瞬间变干净 */}
+              <Text className="chapter-content">{filterAIMetaText(ch?.content || '')}</Text>
               {ch.selectedBranch ? (
                 <View className="user-message-bubble"><Text>{ch.selectedBranch}</Text></View>
               ) : (

@@ -152,16 +152,22 @@
         font-weight: bold;
         text-align: center;
         margin-bottom: 20px;
-        color: #333;
+        
+        /* 👇 修改这里：把原本的 #333 改成企业级亮色变量 #e8e8e8 */
+        color: #e8e8e8; 
       }
 
       .modal-input {
         background-color: #3a3a5a;
         color: #e8e8e8;
-        padding: 12px;
         border-radius: 8px;
         margin-bottom: 24px;
         font-size: 16px;
+        
+        /* 👇 重点替换：删掉原来的 padding: 12px; 改用固定高度 + 仅左右内边距 */
+        height: 88rpx;
+        line-height: 88rpx;
+        padding: 0 24rpx;
       }
 
       .modal-btns {
