@@ -69,7 +69,13 @@ export default function AIModelPage() {
       
       // 延迟返回，让用户看到成功提示
       setTimeout(() => {
-        Taro.navigateBack()
+        const pages = Taro.getCurrentPages()
+        if (pages.length > 1) {
+          Taro.navigateBack()
+        } else {
+          // 如果是直接进入的该页面（无上一级），则回到首页
+          Taro.reLaunch({ url: '/pages/index/index' })
+        }
       }, 1500)
     } catch (error) {
       Taro.showToast({

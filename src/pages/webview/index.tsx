@@ -18,7 +18,13 @@ export default function WebViewPage() {
   }, [])
 
   const handleBack = () => {
-    Taro.navigateBack()
+    const pages = Taro.getCurrentPages()
+    if (pages.length > 1) {
+      Taro.navigateBack()
+    } else {
+      // 兜底：回到小程序首页
+      Taro.reLaunch({ url: '/pages/index/index' })
+    }
   }
 
   const getTitleFromUrl = () => {
