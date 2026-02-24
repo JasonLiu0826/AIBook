@@ -272,10 +272,15 @@
   }
   
   .custom-input {
-    padding: 24rpx;
     background: rgba(15, 15, 26, 0.8);
     border: 2rpx solid #2a2a4a;
     border-radius: 12rpx;
+    
+    /* 👇 重点修改这三行：对接企业级88rpx触控热区规范 */
+    height: 88rpx;
+    line-height: 88rpx;
+    padding: 0 24rpx;         /* 仅保留左右 24rpx 的内边距 */
+    
     color: #e8e8e8;
     font-size: 30rpx;
     margin-bottom: 20rpx;
@@ -358,7 +363,12 @@
     background: rgba(26, 26, 46, 0.8);
     border: 1rpx solid #4a7c59;
     border-radius: 40rpx;
-    padding: 16rpx 32rpx;
+    
+    /* 👇 重点修改这三行：去掉上下padding，用固定高度和行高撑起内容 */
+    height: 72rpx;            /* 与右侧的发送按钮高度对齐 */
+    line-height: 72rpx;       /* 保证文字垂直居中 */
+    padding: 0 32rpx;         /* 仅保留左右 32rpx 的内边距 */
+    
     color: #e8e8e8;
     font-size: 28rpx;
   }
