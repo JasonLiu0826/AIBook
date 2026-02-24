@@ -29,10 +29,10 @@
   }
 }
 
-/* 🌟 输入框与附件大容器 */
+/* 🌟 输入框与附件大容器 (修复版) */
 .textarea-container {
   width: 100%;
-  min-height: 400rpx;
+  /* 移除固定的 min-height，让内容自然撑开 */
   background: #1a1a2e;
   border: 1rpx solid #2a2a4a;
   border-radius: 12rpx;
@@ -40,19 +40,25 @@
   display: flex;
   flex-direction: column;
   transition: border-color 0.2s;
+  overflow: hidden; /* 防止内部元素撑破圆角 */
 
-  &:focus-within { border-color: #4a7c59; }
+  &:focus-within { 
+    border-color: #4a7c59; 
+  }
 
   .textarea {
-    flex: 1;
     width: 100%;
-    min-height: 300rpx;
+    /* 增加基础高度，但使用 max-height 限制，并开启内部滚动 */
+    min-height: 400rpx; 
+    max-height: 800rpx; 
     padding: 24rpx;
     box-sizing: border-box;
     background: transparent;
     border: none;
     color: #e8e8e8;
     font-size: 28rpx;
+    line-height: 1.6; /* 增加行高，防止文字挤在一起 */
+    
     &:focus { outline: none; }
   }
 
