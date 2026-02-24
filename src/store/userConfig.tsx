@@ -16,6 +16,7 @@ type UserConfigContextValue = {
   setConfig: (next: Partial<UserConfigState>) => void
   setPOV: (pov: NarrativePOV) => void
   setSingleOutputLength: (n: number) => void
+  setEnableVibration: (enabled: boolean) => void
   load: () => Promise<void>
   save: () => Promise<void>
 }
@@ -61,11 +62,16 @@ export function UserConfigProvider({ children }: { children: React.ReactNode }) 
     setConfigState(c => ({ ...c, singleOutputLength }))
   }, [])
 
+  const setEnableVibration = useCallback((enableVibration: boolean) => {
+    setConfigState(c => ({ ...c, enableVibration }))
+  }, [])
+
   const value: UserConfigContextValue = {
     config,
     setConfig,
     setPOV,
     setSingleOutputLength,
+    setEnableVibration,
     load,
     save
   }

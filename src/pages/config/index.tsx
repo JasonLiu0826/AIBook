@@ -1,5 +1,14 @@
-import { View, Text, Input, Picker, Switch } from '@tarojs/components' // 👈 这里补上了 Switch
+/*
+ * @Author: jason 1917869590@qq.com
+ * @Date: 2026-02-24 01:43:54
+ * @LastEditors: jason 1917869590@qq.com
+ * @LastEditTime: 2026-02-24 14:01:06
+ * @FilePath: \AIBook_React_TypeScript\src\pages\config\index.tsx
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
+import { View, Text, Input, Picker, Switch } from '@tarojs/components'
 import { useUserConfig } from '@/store/userConfig'
+import { useState, useEffect } from 'react' // 👈 必须引入 useState 和 useEffect
 import type { NarrativePOV } from '@/types'
 import './index.scss'
 
@@ -10,15 +19,33 @@ const POV_OPTIONS: { value: NarrativePOV; label: string }[] = [
 ]
 
 export default function ConfigPage() {
-  // 🌟 1. 在顶部的解构中，加入你刚刚写的 setEnableVibration
   const { config, setSingleOutputLength, setPOV, save, setEnableVibration } = useUserConfig()
 
-  const onLengthChange = (e: { detail: { value: string } }) => {
-    const n = parseInt(e.detail.value, 10)
-    if (!isNaN(n) && n >= 100 && n <= 5000) {
-      setSingleOutputLength(n)
-      save()
-    }
+  // 🌟 1. 核心优化：使用本地临时状态接管输入框，摆脱全局强制刷新导致的"改不了"卡死现象
+  const [lengthStr, setLengthStr] = useState(String(config.singleOutputLength || 800))
+
+  // 🌟 2. 监听全局变化，初始化或重新加载时同步状态
+  useEffect(() => {
+    setLengthStr(String(config.singleOutputLength || 800))
+  }, [config.singleOutputLength])
+
+  // 🌟 3. 实时响应键盘输入（不做阻拦，允许用户先打出 1、12、空白 等非最终状态）
+  const onInput = (e: { detail: { value: string } }) => {
+    setLengthStr(e.detail.value)
+  }
+
+  // 🌟 4. 失去焦点或点击确认时，执行最终的合法性校验
+  const onBlur = () => {
+    let n = parseInt(lengthStr, 10)
+    
+    // 校验：不是数字退回 800；强制修正到 100 - 1500 的范围区间
+    if (isNaN(n)) n = 800
+    if (n < 100) n = 100
+    if (n > 1500) n = 1500
+    
+    setLengthStr(String(n)) // 修正界面展示（如果输入了 99，这里会变成 100）
+    setSingleOutputLength(n) // 同步给底层全局配置
+    save() // 自动保存到本地缓存
   }
 
   const onPOVChange = (e: { detail: { value: string | number } }) => {
@@ -29,9 +56,7 @@ export default function ConfigPage() {
     }
   }
 
-  // 🌟 2. 彻底替换掉原来的 onVibrationChange 函数
   const onVibrationChange = (e: { detail: { value: boolean } }) => {
-    // 使用标准的 set 方法更新状态，告别直接赋值
     setEnableVibration(e.detail.value)
     save()
   }
@@ -40,15 +65,18 @@ export default function ConfigPage() {
     <View className="page-config">
       <View className="section">
         <Text className="label">单次输出字数</Text>
+        {/* 👈 输入框核心优化：使用本地状态避免全局刷新卡死 */}
         <Input
           className="input"
           type="number"
-          placeholder="300–5000"
-          value={String(config.singleOutputLength)}
-          onBlur={onLengthChange}
-          onConfirm={onLengthChange}
+          placeholder="100–1500"
+          value={lengthStr}
+          onInput={onInput}
+          onBlur={onBlur}
+          onConfirm={onBlur}
         />
-        <Text className="hint">建议 500–1500，影响每章长度</Text>
+        {/* 👇 提示文案按照你的需求进行了明确优化 */}
+        <Text className="hint">建议 500–1000。输入后，AI 生成文章的篇幅大小将根据此设定决定；默认 800。字数还会影响Token消耗，请根据需要进行调整</Text>
       </View>
       <View className="section">
         <Text className="label">书写人称</Text>
@@ -65,7 +93,6 @@ export default function ConfigPage() {
         <Text className="hint">第一/二人称代入感更强，第三人称更像传统小说</Text>
       </View>
 
-      {/* 👇 震动反馈开关模块 */}
       <View className="section">
         <View style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <Text className="label" style={{ marginBottom: 0 }}>📳 触觉震动反馈</Text>
