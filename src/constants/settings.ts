@@ -28,8 +28,14 @@ export const STORAGE_KEYS = {
 /** 单本故事的 storage key 前缀，后缀为 storyId */
 export const STORAGE_STORY_PREFIX = 'aibook_story_'
 
-/** 五类设定每区最大字数 */
-export const MAX_SETTING_CHARS = 1000
+/** * 五类设定每区最大字数 
+ * 💡 修改点 1：为了匹配 20KB 的文件大小，将单区字数上限从 1000 放宽到 10000 
+ * （如果不改这个，导入的 20KB 内容依然会被强行截断得只剩 1000 字）
+ */
+export const MAX_SETTING_CHARS = 10000
 
-// 🌟 将允许导入的文件大小上限提升至 10KB (10240 Bytes)
-export const MAX_MD_FILE_BYTES = 10240
+/**
+ * 允许导入的文件大小上限
+ * 💡 修改点 2：将 10KB 放宽至 20KB (20 * 1024 = 20480 Bytes)
+ */
+export const MAX_MD_FILE_BYTES = 20480
