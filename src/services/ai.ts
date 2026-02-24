@@ -1,6 +1,7 @@
 import Taro from '@tarojs/taro'
 import type { GenerateParams, GenerateResult, Chapter } from '@/types'
 import { API_BASE_URL } from '@/config'
+import { MAX_SETTING_CHARS } from '@/constants/settings' // 确保引入了字数上限常量
 
 // 👇 把这段代码粘贴在这里，这是一个所有手机都兼容的万能解码器
 class Utf8Decoder {
@@ -231,6 +232,103 @@ export async function summarizeChapterNode(
       .then((res) => {
         if (res.statusCode !== 200) {
           reject(new Error(`节点提炼失败: ${res.statusCode}`))
+          return
+        }
+        const data = res.data as { summary?: string }
+        if (typeof data?.summary !== 'string') {
+          reject(new Error('返回格式错误：需要 summary 字符串'))
+          return
+        }
+        resolve(data.summary)
+      })
+      .catch(reject)
+  })
+}
+
+/**
+ * 智能追加并处理故事节点压缩
+ * @param currentNodes 当前已存储的所有节点文本
+ * @param newNode 新生成的这一章的节点
+ * @param apiKey 用户配置的 API Key
+ */
+export async function smartAppendStoryNode(
+  currentNodes: string,
+  newNode: string,
+  apiKey: string
+): Promise<string> {
+  // 🌟 改进 3：安全拦截
+  if (!newNode || !newNode.trim()) return currentNodes;
+  if (!apiKey) throw new Error('进行节点压缩需要配置有效的 API Key');
+
+  // 1. 拼接新节点
+  let text = currentNodes?.trim() || ''
+  text = text ? `${text}\n${newNode}` : newNode
+
+  // 2. 按行分割并过滤空行
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+
+  // 3. 保持原有的安全分类策略（保护用户手动输入的非标准格式文本不丢失）
+  const summaryLines = lines.filter(l => l.startsWith('【阶段总结】') || l.startsWith('【全局总结】'))
+  const normalLines = lines.filter(l => !l.startsWith('【阶段总结】') && !l.startsWith('【全局总结】'))
+
+  // 4. 🌟 改进 2：优先触发阶段压缩 (满100条普通节点)
+  if (normalLines.length >= 100) {
+    console.log('触发百条节点阶段压缩')
+    const textToCompress = normalLines.join('\n')
+    const phaseSummary = await compressStoryNodes(textToCompress, 'phase', apiKey)
+    
+    const textAfterPhaseCompress = [...summaryLines, `【阶段总结】${phaseSummary}`].join('\n')
+    
+    // 阶段压缩完成后，如果因为历史总结堆积太多导致总字数依然超标，则执行终极全局压缩
+    if (textAfterPhaseCompress.length >= MAX_SETTING_CHARS * 0.9) {
+      console.log('阶段压缩后字数仍逼近上限，触发终极全局压缩')
+      const globalSummary = await compressStoryNodes(textAfterPhaseCompress, 'global', apiKey)
+      return `【全局总结】${globalSummary}`
+    }
+    
+    return textAfterPhaseCompress
+  }
+
+  // 5. 如果节点没到 100 条，但用户手动贴了长篇大论导致字数超标，直接全局压缩
+  if (text.length >= MAX_SETTING_CHARS * 0.9) {
+    console.log('字数逼近上限，触发全局节点压缩')
+    const compressed = await compressStoryNodes(text, 'global', apiKey)
+    return `【全局总结】${compressed}`
+  }
+
+  // 6. 没有触发任何压缩条件，返回正常追加的文本
+  return text
+}
+
+/**
+ * 压缩故事节点
+ * @param content 需要压缩的节点内容
+ * @param mode 'phase' 阶段压缩(50-100字) | 'global' 全局压缩(100-200字)
+ * @param apiKey 用户API密钥
+ */
+export async function compressStoryNodes(
+  content: string,
+  mode: 'phase' | 'global',
+  apiKey: string
+): Promise<string> {
+  const baseURL = getApiBase()
+  
+  if (baseURL.includes('your-api.com')) {
+    return mode === 'phase' 
+      ? '【系统生成】林默在调查旧公寓时发现了隐藏的线索，并与神秘人建立了初步联系，故事进入暗线调查阶段。' 
+      : '【系统生成】林默从公寓收信开始，历经神秘组织的试探与多次危机，现已掌握核心关键道具，即将开启最终决战。'
+  }
+
+  return new Promise((resolve, reject) => {
+    Taro.request({
+      url: `${baseURL}/compress-nodes`, // 👉 后端需要新增这个接口
+      method: 'POST',
+      data: { content, mode, apiKey },
+      header: { 'Content-Type': 'application/json' }
+    })
+      .then((res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`节点压缩失败: ${res.statusCode}`))
           return
         }
         const data = res.data as { summary?: string }

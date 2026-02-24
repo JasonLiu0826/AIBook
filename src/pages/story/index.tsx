@@ -4,7 +4,7 @@ import Taro from '@tarojs/taro'
 import { useSettings } from '@/store/settings'
 import { useUserConfig } from '@/store/userConfig'
 import { useStory } from '@/store/story'
-import { generateChapterStream, isGenerateApiConfigured, getMockFirstChapter, summarizeChapterNode } from '@/services/ai'
+import { generateChapterStream, isGenerateApiConfigured, getMockFirstChapter, summarizeChapterNode, smartAppendStoryNode } from '@/services/ai'
 import { getAdaptivePaddingBottom } from '@/utils/system'
 import type { Chapter, BranchOption } from '@/types'
 import './index.scss'
@@ -324,13 +324,22 @@ export default function StoryPage() {
       setShowSuccess(true)
       
       if (config.apiKey) {
-        summarizeChapterNode(chapter.title, chapter.content, config.apiKey).then(summary => {
-          if (summary && summary.trim()) {
-            const currentNodes = settings.storyNodes || '';
-            settings.storyNodes = currentNodes + (currentNodes ? '\n' : '') + `- 第${chapter.index}章：${summary}`;
-            saveSettings();
+        summarizeChapterNode(chapter.title, chapter.content, config.apiKey).then(async (newNode) => {
+          if (newNode && newNode.trim()) {
+            // 使用智能压缩机制更新故事节点
+            const updatedNodesText = await smartAppendStoryNode(
+              settings.storyNodes || '', 
+              `- 第${chapter.index}章：${newNode}`, 
+              config.apiKey!
+            );
+            
+            // 更新全局状态和本地缓存
+            settings.storyNodes = updatedNodesText;
+            await saveSettings();
           }
-        }).catch(() => {});
+        }).catch((error) => {
+          console.error('更新故事节点失败:', error);
+        });
       }
       
     } catch (e) {
