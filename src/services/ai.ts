@@ -161,12 +161,16 @@ export async function generateChapterStream(
                 if (parsed.type === 'branches') {
                   try { 
                     const branchesArray = JSON.parse(parsed.value);
+                    console.log('🤖 AI服务接收到分支数据:', branchesArray);
                     finalBranches = [
                       branchesArray[0] || '',
                       branchesArray[1] || '',
                       branchesArray[2] || ''
                     ] as [string, string, string];
-                  } catch (e) {}
+                    console.log('🤖 AI服务处理后的分支数据:', finalBranches);
+                  } catch (e) {
+                    console.error('🤖 AI服务分支数据解析失败:', parsed.value, e);
+                  }
                 }
                 onUpdate(parsed)
               } catch (e) {

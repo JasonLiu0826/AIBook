@@ -222,10 +222,10 @@ export default function AIModelPage() {
 
       <View className="tips">
         <Text className="tips-title">💡 使用提示</Text>
-        <Text className="tips-item">• 演示模式：无需配置，可体验基础功能</Text>
-        <Text className="tips-item">• DeepSeek：提供高质量的中文写作能力</Text>
-        <Text className="tips-item">• API密钥会加密存储在本地</Text>
-        <Text className="tips-item">• 更换模型后建议重新开始新故事</Text>
+        <Text className="tips-item"> 演示模式：无需配置，可体验基础功能</Text>
+        <Text className="tips-item"> DeepSeek：提供高质量的中文写作能力</Text>
+        <Text className="tips-item"> API密钥会加密存储在本地</Text>
+        <Text className="tips-item"> 更换模型后建议重新开始新故事</Text>
       </View>
     </View>
   )

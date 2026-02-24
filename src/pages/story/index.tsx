@@ -216,7 +216,12 @@ export default function StoryPage() {
               vibrateTyping() // 👈 触发打字震动
               break;
             case 'branches':
-              try { partialBranches = JSON.parse(partialData.value); } catch (e) {}
+              try { 
+                partialBranches = JSON.parse(partialData.value);
+                console.log('✅ 成功解析分支数据:', partialBranches);
+              } catch (e) {
+                console.error('❌ 分支数据解析失败:', partialData.value, e);
+              }
               break;
           }
         }
@@ -226,12 +231,27 @@ export default function StoryPage() {
       
       if (!result.title || !result.content) throw new Error('AI返回的内容格式异常，请重试')
       
+      // 🌟 修复：使用我们自己在回调中捕获到的partialBranches作为第一优先级
+      const finalBranchesArray = (result.branches && result.branches.length > 0) 
+        ? result.branches 
+        : (partialBranches && partialBranches.length > 0 ? partialBranches : ["继续探索", "停下思考", "另寻出路"]); // 给一个明确的兜底
+      
+      console.log('📊 最终使用的分支数据:', { 
+        resultBranches: result.branches, 
+        partialBranches, 
+        finalBranchesArray 
+      });
+      
       const chapter: Chapter = {
         id: genId(),
         index: (chapters?.length || 0) + 1,
         title: result.title,
         content: result.content,
-        branches: (result.branches || []).map((text, i) => ({ id: `b_${i}`, text, isCustom: false })) as BranchOption[],
+        branches: finalBranchesArray.map((text: string, i: number) => ({ 
+          id: `b_${i}`, 
+          text, 
+          isCustom: false 
+        })) as BranchOption[],
         createdAt: Date.now()
       }
       
@@ -375,8 +395,16 @@ export default function StoryPage() {
                   <View className="branches">
                     <Text className="branches-label">选择下一步剧情发展：</Text>
                     {ch.branches.map((b, idx) => {
-                      const text = typeof b === 'string' ? b : b?.text;
-                      const id = typeof b === 'string' ? `b_${idx}` : (b?.id || `b_${idx}`);
+                      // 强制转换为对象类型，避免 typeof 误判，并提供明确的降级日志
+                      const branchItem = b as BranchOption; 
+                      const text = branchItem?.text || `未知分支 ${idx + 1}`; 
+                      const id = branchItem?.id || `b_${idx}`;
+                      
+                      // 添加调试日志
+                      if (!branchItem?.text) {
+                        console.warn('分支数据异常:', { branchItem, idx, branches: ch.branches });
+                      }
+                      
                       return (
                         <Button key={id} className="branch-btn" onClick={() => onSelectBranch(text)}>
                           {text}
