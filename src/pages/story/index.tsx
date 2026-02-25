@@ -499,11 +499,19 @@ export default function StoryPage() {
           }
 
           const ctx = canvas.getContext('2d');
-          const dpr = Taro.getSystemInfoSync().pixelRatio;
 
-          // 2. 设定排版参数 (固定宽度 800px，高度动态计算)
-          const canvasWidth = 800;
-          const padding = 60;
+          // 🌟 核心修复 1：强制解绑屏幕 dpr (设备像素比)
+          // 手机屏幕 dpr 很高，如果强行放大画布尺寸，极易撑爆 iOS 4096px 的硬件极限导致下方全黑。
+          // 导出图片直接使用 1:1 绘制，750px 的标准海报宽度已经足够清晰。
+          const exportDpr = 1; 
+
+          // 🌟 核心修复 2：设立硬件安全高度警戒线
+          // 绝大部分手机（特别是 iOS/微信小游戏底层）的 Canvas 最大面积/边长不能超过 4096。
+          const MAX_CANVAS_HEIGHT = 4000;
+
+          // 设定排版基础参数
+          const canvasWidth = 750;
+          const padding = 50;
           const contentWidth = canvasWidth - padding * 2;
           
           let currentY = padding;
@@ -541,16 +549,13 @@ export default function StoryPage() {
             currentY += 60; // 章节间距
           });
 
-          // 底部版权区高度
+          // --- 2. 限制极值并初始化画布 ---
           currentY += 60; // 底部留白
+          const totalHeight = Math.min(currentY, MAX_CANVAS_HEIGHT); 
 
-          // 4. 安全限制：检查微信最大 Canvas 高度限制（通常 4096），如果超出强制截断防止闪退
-          const totalHeight = Math.min(currentY, 8000); 
-
-          // 5. 设置画布实际大小
-          canvas.width = canvasWidth * dpr;
-          canvas.height = totalHeight * dpr;
-          ctx.scale(dpr, dpr);
+          canvas.width = canvasWidth * exportDpr;
+          canvas.height = totalHeight * exportDpr;
+          ctx.scale(exportDpr, exportDpr);
 
           // 6. 开始正式绘制！
           // 画背景
@@ -563,18 +568,16 @@ export default function StoryPage() {
 
           let drawY = padding;
 
-          // 画主标题
           ctx.fillStyle = '#111111';
           ctx.font = 'bold 44px sans-serif';
           ctx.fillText(titleText, padding, drawY + 44);
-          drawY += 60 + 40;
+          drawY += 100;
 
-          // 画时间与水印
           ctx.fillStyle = '#888888';
           ctx.font = '28px sans-serif';
           const timestamp = new Date().toLocaleString('zh-CN');
-          ctx.fillText(`📅 导出时间: ${timestamp}  |  📝 AIBook `, padding, drawY + 28);
-          drawY += 30 + 60;
+          ctx.fillText(`📅 导出时间: ${timestamp}  |  📝 AIBook 智能创作`, padding, drawY + 28);
+          drawY += 90;
 
           // 画分割线
           ctx.strokeStyle = '#EEEEEE';
@@ -584,16 +587,15 @@ export default function StoryPage() {
           ctx.lineTo(canvasWidth - padding, drawY - 30);
           ctx.stroke();
 
-          // 循环画每一章
           for (let index = 0; index < chapters.length; index++) {
             const ch = chapters[index];
             
-            // 如果高度快超出画布，提前终止渲染
-            if (drawY > totalHeight - 150) {
-              ctx.fillStyle = '#999999';
+            // 🌟 核心修复 3：动态裁切保护。一旦画到了极值边缘，立刻刹车并提示用户
+            if (drawY > totalHeight - 160) {
+              ctx.fillStyle = '#FF5722';
               ctx.font = '28px sans-serif';
-              ctx.fillText('...（篇幅过长，已截断展示）', padding, drawY + 30);
-              break;
+              ctx.fillText('...（受手机硬件限制，超长篇幅已截断）', padding, drawY + 30);
+              break; 
             }
 
             // 画章节标题
@@ -621,14 +623,16 @@ export default function StoryPage() {
             drawY += 60;
           }
 
-          // 画底部标识
-          ctx.fillStyle = '#BBBBBB';
-          ctx.font = '24px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('- THE END -', canvasWidth / 2, drawY + 20);
+          // 如果还没画到极限就结束了，打上完结标
+          if (drawY <= totalHeight - 50) {
+             ctx.fillStyle = '#BBBBBB';
+             ctx.font = '24px sans-serif';
+             ctx.textAlign = 'center';
+             ctx.fillText('- THE END -', canvasWidth / 2, drawY + 20);
+          }
 
-          // 7. 导出并保存相册
-          exportCanvasToAlbum(canvas);
+          // 7. 导出并保存相册 (需要把宽高的精确尺寸传进去)
+          exportCanvasToAlbum(canvas, canvasWidth, totalHeight);
         });
     } catch (error) {
       Taro.hideLoading();
@@ -637,9 +641,15 @@ export default function StoryPage() {
   }
 
   // 🌟 企业级：相册保存及权限兜底处理
-  const exportCanvasToAlbum = (canvas: any) => {
+  const exportCanvasToAlbum = (canvas: any, exportWidth: number, exportHeight: number) => {
     Taro.canvasToTempFilePath({
       canvas: canvas,
+      x: 0,
+      y: 0,
+      width: exportWidth,
+      height: exportHeight,
+      destWidth: exportWidth,     // 🌟 核心修复 4：明确指定生成图片的尺寸，拒绝微信内部乱缩放
+      destHeight: exportHeight,
       fileType: 'png',
       quality: 1,
       success: (res) => {
