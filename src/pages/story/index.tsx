@@ -223,6 +223,7 @@ export default function StoryPage() {
   const {
     chapters,
     currentStoryId,
+    currentStoryTitle, // 🌟 新增这一行：获取当前故事标题
     addChapter,
     generating,
     setGenerating,
@@ -479,11 +480,22 @@ export default function StoryPage() {
     }
   }
 
-  // 🌟 企业级：生成并导出排版长图
+  // 🌟 企业级：生成单章精美卡片
   const handleExportImage = async () => {
     if (!chapters || chapters.length === 0) return;
     setShowExportSheet(false);
-    Taro.showLoading({ title: '正在排版绘制...', mask: true });
+    Taro.showLoading({ title: '正在绘制卡片...', mask: true });
+
+    // 🌟 尝试获取微信用户昵称（静默获取，若无权限则用默认值）
+    let userName = '微信创作者';
+    try {
+      const userInfoRes = await Taro.getUserInfo();
+      if (userInfoRes?.userInfo?.nickName) {
+        userName = userInfoRes.userInfo.nickName;
+      }
+    } catch (e) {
+      console.log('未授权获取用户昵称，使用默认值');
+    }
 
     try {
       // 1. 获取 Canvas 2D 对象
@@ -505,138 +517,119 @@ export default function StoryPage() {
           // 导出图片直接使用 1:1 绘制，750px 的标准海报宽度已经足够清晰。
           const exportDpr = 1; 
 
-          // 🌟 核心修复 2：设立硬件安全高度警戒线
-          // 绝大部分手机（特别是 iOS/微信小游戏底层）的 Canvas 最大面积/边长不能超过 4096。
-          const MAX_CANVAS_HEIGHT = 4000;
+          // 🌟 修复点 1：我们将安全高度放宽到 8000（因为 dpr 是 1，8000 完全不会内存溢出）
+          const MAX_CANVAS_HEIGHT = 8000;
 
-          // 设定排版基础参数
           const canvasWidth = 750;
-          const padding = 50;
+          const padding = 60;
           const contentWidth = canvasWidth - padding * 2;
           
           let currentY = padding;
 
-          // 3. 预检计算：计算所需的总高度
-          // 设置默认字体以便计算
-          ctx.font = 'bold 44px sans-serif';
-          const titleText = lastChapter?.title ? `${lastChapter.title.slice(0,10)} - 互动小说` : 'AIBook 互动小说';
-          currentY += 60; // 主标题高度
-          currentY += 40; // 标题下间距
+          // --- 1. 预计算高度 ---
+          // 标题计算
+          ctx.font = 'bold 50px sans-serif';
+          // 如果没有名字，给个兜底
+          const titleText = currentStoryTitle || 'AIBook 互动小说';
+          currentY += measureTextHeight(ctx, titleText, contentWidth, 65);
           
+          // 日期与标签计算
+          currentY += 40; 
           ctx.font = '28px sans-serif';
-          currentY += 30; // 导出时间高度
-          currentY += 60; // 分割间距
+          currentY += 30; 
+          currentY += 50; 
 
-          chapters.forEach((ch, index) => {
-            // 章节标题测量
-            ctx.font = 'bold 34px sans-serif';
-            const chTitle = `第 ${ch?.index || index + 1} 章 ${ch?.title || ''}`;
-            currentY += measureTextHeight(ctx, chTitle, contentWidth, 50);
-            currentY += 30; // 标题与正文间距
+          // 第一章内容计算（截断 300 字）
+          const firstCh = chapters[0];
+          let cleanContent = filterAIMetaText(firstCh?.content || '');
+          if (cleanContent.length > 300) {
+            cleanContent = cleanContent.slice(0, 300) + '......（未完待续）';
+          }
+          ctx.font = '30px sans-serif';
+          currentY += measureTextHeight(ctx, cleanContent, contentWidth, 50);
 
-            // 章节正文测量
-            ctx.font = '30px sans-serif';
-            // 清理正文中的 AI 元数据
-            const cleanContent = filterAIMetaText(ch?.content || '');
-            currentY += measureTextHeight(ctx, cleanContent, contentWidth, 48);
-            
-            // 用户选择测量
-            if (ch.selectedBranch) {
-              currentY += 20;
-              ctx.font = 'italic 28px sans-serif';
-              currentY += measureTextHeight(ctx, `👤 你的选择：${ch.selectedBranch}`, contentWidth, 40);
-            }
-            currentY += 60; // 章节间距
-          });
-
-          // --- 2. 限制极值并初始化画布 ---
-          currentY += 60; // 底部留白
+          // 底部区域计算
+          currentY += 80; // 留白
+          currentY += 30; // THE END
+          currentY += 40; // 留白
+          currentY += 30; // 微信名 + AIBook
+          currentY += 20; // 留白
+          currentY += 24; // 下载 App 提示
+          currentY += 60; // 底部最终留白
           const totalHeight = Math.min(currentY, MAX_CANVAS_HEIGHT); 
 
           canvas.width = canvasWidth * exportDpr;
           canvas.height = totalHeight * exportDpr;
           ctx.scale(exportDpr, exportDpr);
 
-          // 6. 开始正式绘制！
-          // 画背景
-          ctx.fillStyle = '#FDFDFD'; // 柔和的护眼纸张色
-          ctx.fillRect(0, 0, canvasWidth, totalHeight);
+          // --- 2. 正式绘制卡片 ---
+          // 画卡片背景
+          ctx.fillStyle = '#FDFDFD'; 
+          ctx.fillRect(0, 0, canvasWidth, totalHeight); 
           
-          // 画顶部装饰条
-          ctx.fillStyle = '#0052D9'; // 主题蓝
-          ctx.fillRect(0, 0, canvasWidth, 12);
+          // 顶部高级感装饰条
+          ctx.fillStyle = '#0052D9'; 
+          ctx.fillRect(0, 0, canvasWidth, 16); 
 
-          let drawY = padding;
+          let drawY = padding + 20;
+          ctx.textAlign = 'left'; // 确保文字靠左
 
+          // 画大标题
           ctx.fillStyle = '#111111';
-          ctx.font = 'bold 44px sans-serif';
-          ctx.fillText(titleText, padding, drawY + 44);
-          drawY += 100;
+          ctx.font = 'bold 50px sans-serif';
+          drawY = drawWrappedText(ctx, titleText, padding, drawY + 40, contentWidth, 65);
 
+          // 画日期标签
+          drawY += 40;
           ctx.fillStyle = '#888888';
           ctx.font = '28px sans-serif';
           const timestamp = new Date().toLocaleString('zh-CN');
-          ctx.fillText(`📅 导出时间: ${timestamp}  |  📝 AIBook 智能创作`, padding, drawY + 28);
-          drawY += 90;
+          ctx.fillText(`${timestamp}  |  📝 AIBook 智能创作`, padding, drawY + 28);
+          drawY += 50;
 
           // 画分割线
           ctx.strokeStyle = '#EEEEEE';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(padding, drawY - 30);
-          ctx.lineTo(canvasWidth - padding, drawY - 30);
+          ctx.moveTo(padding, drawY);
+          ctx.lineTo(canvasWidth - padding, drawY);
           ctx.stroke();
+          drawY += 40;
 
-          for (let index = 0; index < chapters.length; index++) {
-            const ch = chapters[index];
-            
-            // 🌟 核心修复 3：动态裁切保护。一旦画到了极值边缘，立刻刹车并提示用户
-            if (drawY > totalHeight - 160) {
-              ctx.fillStyle = '#FF5722';
-              ctx.font = '28px sans-serif';
-              ctx.fillText('...（受手机硬件限制，超长篇幅已截断）', padding, drawY + 30);
-              break; 
-            }
+          // 画第一章正文
+          ctx.fillStyle = '#333333';
+          ctx.font = '30px sans-serif';
+          drawY = drawWrappedText(ctx, cleanContent, padding, drawY + 30, contentWidth, 50);
+          
+          // --- 3. 画底部品牌与引流区 ---
+          drawY += 80;
 
-            // 画章节标题
-            ctx.fillStyle = '#222222';
-            ctx.font = 'bold 34px sans-serif';
-            const chTitle = `第 ${ch?.index || index + 1} 章 ${ch?.title || ''}`;
-            drawY = drawWrappedText(ctx, chTitle, padding, drawY + 34, contentWidth, 50);
-            drawY += 30;
+          // THE END
+          ctx.fillStyle = '#BBBBBB';
+          ctx.font = 'bold 28px sans-serif';
+          ctx.textAlign = 'center'; // 改为居中绘制
+          ctx.fillText('- 第一幕 -', canvasWidth / 2, drawY);
+          drawY += 50;
 
-            // 画正文
-            ctx.fillStyle = '#444444';
-            ctx.font = '30px sans-serif';
-            const cleanContent = filterAIMetaText(ch?.content || '');
-            drawY = drawWrappedText(ctx, cleanContent, padding, drawY + 30, contentWidth, 48);
-            
-            // 画分支选择
-            if (ch.selectedBranch) {
-              drawY += 20;
-              ctx.fillStyle = '#0052D9';
-              ctx.font = 'italic 28px sans-serif';
-              // 画一个小小的背景块
-              ctx.fillRect(padding - 10, drawY, 6, 30);
-              drawY = drawWrappedText(ctx, `你的选择：${ch.selectedBranch}`, padding + 10, drawY + 28, contentWidth - 20, 40);
-            }
-            drawY += 60;
-          }
+          // 用户名 + 小程序名
+          ctx.fillStyle = '#666666';
+          ctx.font = '26px sans-serif';
+          ctx.fillText(`创作者：${userName} · AIBook`, canvasWidth / 2, drawY);
+          drawY += 35;
 
-          // 如果还没画到极限就结束了，打上完结标
-          if (drawY <= totalHeight - 50) {
-             ctx.fillStyle = '#BBBBBB';
-             ctx.font = '24px sans-serif';
-             ctx.textAlign = 'center';
-             ctx.fillText('- THE END -', canvasWidth / 2, drawY + 20);
-          }
+          // 引导下载
+          ctx.fillStyle = '#999999';
+          ctx.font = '22px sans-serif';
+          ctx.fillText('体验更多内容请下载App', canvasWidth / 2, drawY);
 
-          // 7. 导出并保存相册 (需要把宽高的精确尺寸传进去)
-          exportCanvasToAlbum(canvas, canvasWidth, totalHeight);
+          // 🌟 修复点 3（最关键）：给 GPU 留出 300 毫秒的刷新缓冲时间，避免底部没画完就被截掉
+          setTimeout(() => {
+            exportCanvasToAlbum(canvas, canvasWidth, totalHeight);
+          }, 600);
         });
     } catch (error) {
       Taro.hideLoading();
-      Taro.showToast({ title: '长图生成失败', icon: 'error' });
+      Taro.showToast({ title: '卡片生成失败', icon: 'error' });
     }
   }
 
@@ -829,14 +822,14 @@ export default function StoryPage() {
           <View className="sheet-item" onClick={() => { triggerVibrate('light'); handleCopyText(); }}><Text className="item-text">📄 复制生成纯文本</Text></View>
           <View className="sheet-item" onClick={() => { triggerVibrate('light'); exportAsFile('txt'); }}><Text className="item-text">📁 导出 TXT 文本文件</Text></View>
           <View className="sheet-item" onClick={() => { triggerVibrate('light'); exportAsFile('md'); }}><Text className="item-text">📝 导出 Markdown 文件</Text></View>
-          <View className="sheet-item" onClick={() => { triggerVibrate('light'); handleExportImage(); }}><Text className="item-text">🖼️ 生成排版长图</Text></View>
+          <View className="sheet-item" onClick={() => { triggerVibrate('light'); handleExportImage(); }}><Text className="item-text">🖼️ 生成卡片</Text></View>
           <View className="sheet-item disabled" onClick={() => { triggerVibrate('medium'); Taro.showToast({ title: '仅供App功能开放', icon: 'error' }) }}><Text className="item-text">📑 导出 PDF 文件</Text><Text className="tag-app">App专属</Text></View>
           <View className="sheet-item disabled" onClick={() => { triggerVibrate('medium'); Taro.showToast({ title: '仅供App功能开放', icon: 'error' }) }}><Text className="item-text">📚 导出 EPUB 电子书</Text><Text className="tag-app">App专属</Text></View>
         </View>
         <View className="sheet-footer" onClick={() => setShowExportSheet(false)}>取消</View>
       </View>
 
-      {/* 👇 🌟 隐形 Canvas 画布，专用于离屏绘制长图（绝对定位移出屏幕） */}
+      {/* 👇 🌟 隐形 Canvas 画布，强行撑开 CSS 高度以匹配最长的小说长度 */}
       <Canvas 
         type="2d" 
         id="poster-canvas" 
@@ -844,8 +837,8 @@ export default function StoryPage() {
           position: 'fixed', 
           left: '-9999px', 
           top: '-9999px', 
-          width: '800px', 
-          height: '100px', 
+          width: '750px', // 👈 与逻辑画布保持 750 的一致
+          height: '8000px', // 👈 修复点 4：暴力突破 DOM 裁剪屏障，不再写 100px
           zIndex: -1 
         }} 
       />
