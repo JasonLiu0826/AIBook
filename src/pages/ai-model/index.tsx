@@ -5,7 +5,7 @@ import { useUserConfig } from '@/store/userConfig'
 import './index.scss'
 
 interface AIModelConfig {
-  provider: 'mock' | 'deepseek' | 'openai' | 'custom'
+  provider: 'deepseek' | 'custom'
   apiKey: string
   customApiUrl: string
 }
@@ -13,32 +13,28 @@ interface AIModelConfig {
 export default function AIModelPage() {
   const { config, setConfig } = useUserConfig()
   const [localConfig, setLocalConfig] = useState<AIModelConfig>({
-    provider: config.aiProvider || 'mock',
+    provider: (config.aiProvider === 'deepseek' || config.aiProvider === 'custom') ? config.aiProvider : 'deepseek',
     apiKey: config.apiKey || '',
     customApiUrl: config.customApiUrl || ''
   })
   const [saving, setSaving] = useState(false)
 
   const providerOptions = [
-    { label: '演示模式（Mock）', value: 'mock' },
     { label: 'DeepSeek大模型', value: 'deepseek' },
-    { label: 'OpenAI', value: 'openai' },
     { label: '自定义API', value: 'custom' }
   ]
 
   const handleProviderChange = (e: any) => {
     const selectedIndex = e.detail.value
-    const selectedProvider = providerOptions[selectedIndex].value as 'mock' | 'deepseek' | 'openai' | 'custom'
+    const selectedProvider = providerOptions[selectedIndex].value as 'deepseek' | 'custom'
     setLocalConfig(prev => ({
       ...prev,
-      provider: selectedProvider,
-      // 切换到mock模式时清空API密钥
-      ...(selectedProvider === 'mock' && { apiKey: '' })
+      provider: selectedProvider
     }))
   }
 
   const handleSave = async () => {
-    if (localConfig.provider !== 'mock' && localConfig.provider !== 'custom' && !localConfig.apiKey.trim()) {
+    if (localConfig.provider !== 'custom' && !localConfig.apiKey.trim()) {
       Taro.showToast({
         title: '请输入API密钥',
         icon: 'none'
@@ -95,13 +91,6 @@ export default function AIModelPage() {
 
   const getProviderInfo = () => {
     switch (localConfig.provider) {
-      case 'mock':
-        return {
-          title: '演示模式',
-          desc: '使用内置示例数据，无需配置API密钥',
-          showApiKey: false,
-          showCustomUrl: false
-        }
       case 'deepseek':
         return {
           title: 'DeepSeek大模型',
@@ -109,17 +98,10 @@ export default function AIModelPage() {
           showApiKey: true,
           showCustomUrl: false
         }
-      case 'openai':
-        return {
-          title: 'OpenAI',
-          desc: '使用OpenAI的GPT系列模型',
-          showApiKey: true,
-          showCustomUrl: false
-        }
       case 'custom':
         return {
           title: '自定义API',
-          desc: '连接您自己的AI服务接口',
+          desc: '连接您自己的AI服务接口，支持硅基流动、Kimi、GLM等兼容OpenAI格式的大模型平台',
           showApiKey: true,
           showCustomUrl: true
         }
@@ -222,8 +204,8 @@ export default function AIModelPage() {
 
       <View className="tips">
         <Text className="tips-title">💡 使用提示</Text>
-        <Text className="tips-item"> 演示模式：无需配置，可体验基础功能</Text>
         <Text className="tips-item"> DeepSeek：提供高质量的中文写作能力</Text>
+        <Text className="tips-item"> 自定义API：支持硅基流动、Kimi、GLM等兼容OpenAI格式的大模型平台</Text>
         <Text className="tips-item"> API密钥会加密存储在本地</Text>
         <Text className="tips-item"> 更换模型后建议重新开始新故事</Text>
       </View>

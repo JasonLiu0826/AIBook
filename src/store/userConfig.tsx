@@ -8,7 +8,7 @@ const defaultUserConfig: UserConfigState = {
   pov: 'third',
   perspective: 'omniscient',   // 🌟 默认上帝视角
   specificCharacterName: '',   // 🌟 默认名字为空
-  aiProvider: 'mock',
+  aiProvider: 'deepseek', // 🌟 从 'mock' 改为 'deepseek'
   apiKey: '',
   customApiUrl: ''
 }

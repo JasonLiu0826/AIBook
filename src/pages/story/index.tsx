@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { View, Text, Button, Input, ScrollView } from '@tarojs/components'
+import { View, Text, Button, Input, ScrollView, Canvas } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useSettings } from '@/store/settings'
 import { useUserConfig } from '@/store/userConfig'
@@ -38,6 +38,74 @@ export function useChatScroll(isGenerating: boolean) {
 
 function genId() {
   return `ch_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+// 🌟 企业级排版引擎：文本换行与测量
+function measureTextHeight(
+  ctx: any,
+  text: string,
+  maxWidth: number,
+  lineHeight: number
+): number {
+  if (!text) return 0;
+  const paragraphs = text.split('\n');
+  let totalHeight = 0;
+
+  for (const p of paragraphs) {
+    if (!p.trim()) {
+      totalHeight += lineHeight; // 空行
+      continue;
+    }
+    let line = '';
+    for (let i = 0; i < p.length; i++) {
+      const testLine = line + p[i];
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && i > 0) {
+        line = p[i];
+        totalHeight += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    totalHeight += lineHeight;
+  }
+  return totalHeight;
+}
+
+// 🌟 企业级排版引擎：实际绘制文本
+function drawWrappedText(
+  ctx: any,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number
+): number {
+  if (!text) return y;
+  const paragraphs = text.split('\n');
+  let currentY = y;
+
+  for (const p of paragraphs) {
+    if (!p.trim()) {
+      currentY += lineHeight;
+      continue;
+    }
+    let line = '';
+    for (let i = 0; i < p.length; i++) {
+      const testLine = line + p[i];
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && i > 0) {
+        ctx.fillText(line, x, currentY);
+        line = p[i];
+        currentY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, x, currentY);
+    currentY += lineHeight;
+  }
+  return currentY;
 }
 
 function exportChaptersToText(chapters: Chapter[]): string {
@@ -411,13 +479,202 @@ export default function StoryPage() {
     }
   }
 
-  const handleExportImage = () => {
-    setShowExportSheet(false)
-    Taro.showLoading({ title: '绘制中...' })
-    setTimeout(() => {
-      Taro.hideLoading()
-      Taro.showToast({ title: '长图模块准备中，敬请期待', icon: 'none', duration: 2500 })
-    }, 1000)
+  // 🌟 企业级：生成并导出排版长图
+  const handleExportImage = async () => {
+    if (!chapters || chapters.length === 0) return;
+    setShowExportSheet(false);
+    Taro.showLoading({ title: '正在排版绘制...', mask: true });
+
+    try {
+      // 1. 获取 Canvas 2D 对象
+      const query = Taro.createSelectorQuery();
+      query.select('#poster-canvas')
+        .fields({ node: true, size: true })
+        .exec(async (res) => {
+          const canvas = res[0]?.node;
+          if (!canvas) {
+            Taro.hideLoading();
+            Taro.showToast({ title: '画布初始化失败', icon: 'error' });
+            return;
+          }
+
+          const ctx = canvas.getContext('2d');
+          const dpr = Taro.getSystemInfoSync().pixelRatio;
+
+          // 2. 设定排版参数 (固定宽度 800px，高度动态计算)
+          const canvasWidth = 800;
+          const padding = 60;
+          const contentWidth = canvasWidth - padding * 2;
+          
+          let currentY = padding;
+
+          // 3. 预检计算：计算所需的总高度
+          // 设置默认字体以便计算
+          ctx.font = 'bold 44px sans-serif';
+          const titleText = lastChapter?.title ? `${lastChapter.title.slice(0,10)} - 互动小说` : 'AIBook 互动小说';
+          currentY += 60; // 主标题高度
+          currentY += 40; // 标题下间距
+          
+          ctx.font = '28px sans-serif';
+          currentY += 30; // 导出时间高度
+          currentY += 60; // 分割间距
+
+          chapters.forEach((ch, index) => {
+            // 章节标题测量
+            ctx.font = 'bold 34px sans-serif';
+            const chTitle = `第 ${ch?.index || index + 1} 章 ${ch?.title || ''}`;
+            currentY += measureTextHeight(ctx, chTitle, contentWidth, 50);
+            currentY += 30; // 标题与正文间距
+
+            // 章节正文测量
+            ctx.font = '30px sans-serif';
+            // 清理正文中的 AI 元数据
+            const cleanContent = filterAIMetaText(ch?.content || '');
+            currentY += measureTextHeight(ctx, cleanContent, contentWidth, 48);
+            
+            // 用户选择测量
+            if (ch.selectedBranch) {
+              currentY += 20;
+              ctx.font = 'italic 28px sans-serif';
+              currentY += measureTextHeight(ctx, `👤 你的选择：${ch.selectedBranch}`, contentWidth, 40);
+            }
+            currentY += 60; // 章节间距
+          });
+
+          // 底部版权区高度
+          currentY += 60; // 底部留白
+
+          // 4. 安全限制：检查微信最大 Canvas 高度限制（通常 4096），如果超出强制截断防止闪退
+          const totalHeight = Math.min(currentY, 8000); 
+
+          // 5. 设置画布实际大小
+          canvas.width = canvasWidth * dpr;
+          canvas.height = totalHeight * dpr;
+          ctx.scale(dpr, dpr);
+
+          // 6. 开始正式绘制！
+          // 画背景
+          ctx.fillStyle = '#FDFDFD'; // 柔和的护眼纸张色
+          ctx.fillRect(0, 0, canvasWidth, totalHeight);
+          
+          // 画顶部装饰条
+          ctx.fillStyle = '#0052D9'; // 主题蓝
+          ctx.fillRect(0, 0, canvasWidth, 12);
+
+          let drawY = padding;
+
+          // 画主标题
+          ctx.fillStyle = '#111111';
+          ctx.font = 'bold 44px sans-serif';
+          ctx.fillText(titleText, padding, drawY + 44);
+          drawY += 60 + 40;
+
+          // 画时间与水印
+          ctx.fillStyle = '#888888';
+          ctx.font = '28px sans-serif';
+          const timestamp = new Date().toLocaleString('zh-CN');
+          ctx.fillText(`📅 导出时间: ${timestamp}  |  📝 AIBook `, padding, drawY + 28);
+          drawY += 30 + 60;
+
+          // 画分割线
+          ctx.strokeStyle = '#EEEEEE';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(padding, drawY - 30);
+          ctx.lineTo(canvasWidth - padding, drawY - 30);
+          ctx.stroke();
+
+          // 循环画每一章
+          for (let index = 0; index < chapters.length; index++) {
+            const ch = chapters[index];
+            
+            // 如果高度快超出画布，提前终止渲染
+            if (drawY > totalHeight - 150) {
+              ctx.fillStyle = '#999999';
+              ctx.font = '28px sans-serif';
+              ctx.fillText('...（篇幅过长，已截断展示）', padding, drawY + 30);
+              break;
+            }
+
+            // 画章节标题
+            ctx.fillStyle = '#222222';
+            ctx.font = 'bold 34px sans-serif';
+            const chTitle = `第 ${ch?.index || index + 1} 章 ${ch?.title || ''}`;
+            drawY = drawWrappedText(ctx, chTitle, padding, drawY + 34, contentWidth, 50);
+            drawY += 30;
+
+            // 画正文
+            ctx.fillStyle = '#444444';
+            ctx.font = '30px sans-serif';
+            const cleanContent = filterAIMetaText(ch?.content || '');
+            drawY = drawWrappedText(ctx, cleanContent, padding, drawY + 30, contentWidth, 48);
+            
+            // 画分支选择
+            if (ch.selectedBranch) {
+              drawY += 20;
+              ctx.fillStyle = '#0052D9';
+              ctx.font = 'italic 28px sans-serif';
+              // 画一个小小的背景块
+              ctx.fillRect(padding - 10, drawY, 6, 30);
+              drawY = drawWrappedText(ctx, `你的选择：${ch.selectedBranch}`, padding + 10, drawY + 28, contentWidth - 20, 40);
+            }
+            drawY += 60;
+          }
+
+          // 画底部标识
+          ctx.fillStyle = '#BBBBBB';
+          ctx.font = '24px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('- THE END -', canvasWidth / 2, drawY + 20);
+
+          // 7. 导出并保存相册
+          exportCanvasToAlbum(canvas);
+        });
+    } catch (error) {
+      Taro.hideLoading();
+      Taro.showToast({ title: '长图生成失败', icon: 'error' });
+    }
+  }
+
+  // 🌟 企业级：相册保存及权限兜底处理
+  const exportCanvasToAlbum = (canvas: any) => {
+    Taro.canvasToTempFilePath({
+      canvas: canvas,
+      fileType: 'png',
+      quality: 1,
+      success: (res) => {
+        const tempFilePath = res.tempFilePath;
+        Taro.saveImageToPhotosAlbum({
+          filePath: tempFilePath,
+          success: () => {
+            Taro.hideLoading();
+            Taro.showToast({ title: '已保存到相册', icon: 'success' });
+          },
+          fail: (err) => {
+            Taro.hideLoading();
+            if (err.errMsg.includes('auth deny') || err.errMsg.includes('fail auth deny')) {
+              // 用户曾经拒绝过授权，引导去设置页开启
+              Taro.showModal({
+                title: '需要保存权限',
+                content: '请在设置中开启「相册」权限，才能保存长图哦',
+                confirmText: '去设置',
+                success: (modalRes) => {
+                  if (modalRes.confirm) Taro.openSetting();
+                }
+              });
+            } else if (err.errMsg.includes('cancel')) {
+              Taro.showToast({ title: '已取消保存', icon: 'none' });
+            } else {
+              Taro.showToast({ title: '保存失败，请重试', icon: 'none' });
+            }
+          }
+        });
+      },
+      fail: () => {
+        Taro.hideLoading();
+        Taro.showToast({ title: '画布导出失败', icon: 'error' });
+      }
+    });
   }
 
   if (!currentStoryId) {
@@ -568,6 +825,21 @@ export default function StoryPage() {
         </View>
         <View className="sheet-footer" onClick={() => setShowExportSheet(false)}>取消</View>
       </View>
+
+      {/* 👇 🌟 隐形 Canvas 画布，专用于离屏绘制长图（绝对定位移出屏幕） */}
+      <Canvas 
+        type="2d" 
+        id="poster-canvas" 
+        style={{ 
+          position: 'fixed', 
+          left: '-9999px', 
+          top: '-9999px', 
+          width: '800px', 
+          height: '100px', 
+          zIndex: -1 
+        }} 
+      />
+      
     </View>
   )
 }

@@ -84,7 +84,11 @@ export async function generateChapterStream(
   params: GenerateParams, 
   onUpdate: (partialData: { type: string; value: string }) => void
 ): Promise<GenerateResult> {
-  const baseURL = getApiBase()
+  // 🌟 修改点：判断如果用户选择了 custom 并且填写了自定义地址，则优先使用该自定义地址
+  let baseURL = getApiBase()
+  if (params.userConfig.aiProvider === 'custom' && params.userConfig.customApiUrl) {
+    baseURL = params.userConfig.customApiUrl.replace(/\/$/, ''); // 去除末尾可能存在的斜杠
+  }
 
   return new Promise((resolve, reject) => {
     if (baseURL.includes('your-api.com')) {
@@ -213,9 +217,14 @@ export function getMockFirstChapter(): GenerateResult {
 export async function summarizeChapterNode(
   chapterTitle: string, 
   chapterContent: string, 
-  apiKey: string
+  apiKey: string,
+  customApiUrl?: string
 ): Promise<string> {
-  const baseURL = getApiBase()
+  // 🌟 添加自定义API地址支持
+  let baseURL = getApiBase()
+  if (customApiUrl) {
+    baseURL = customApiUrl.replace(/\/$/, ''); // 去除末尾可能存在的斜杠
+  }
   
   if (baseURL.includes('your-api.com')) {
     // 模拟模式下返回空字符串（不记录节点）
@@ -275,14 +284,16 @@ export async function smartAppendStoryNode(
   if (normalLines.length >= 100) {
     console.log('触发百条节点阶段压缩')
     const textToCompress = normalLines.join('\n')
-    const phaseSummary = await compressStoryNodes(textToCompress, 'phase', apiKey)
+    // 🌟 传递自定义API地址参数
+    const phaseSummary = await compressStoryNodes(textToCompress, 'phase', apiKey, '')
     
     const textAfterPhaseCompress = [...summaryLines, `【阶段总结】${phaseSummary}`].join('\n')
     
     // 阶段压缩完成后，如果因为历史总结堆积太多导致总字数依然超标，则执行终极全局压缩
     if (textAfterPhaseCompress.length >= MAX_SETTING_CHARS * 0.9) {
       console.log('阶段压缩后字数仍逼近上限，触发终极全局压缩')
-      const globalSummary = await compressStoryNodes(textAfterPhaseCompress, 'global', apiKey)
+      // 🌟 传递自定义API地址参数
+      const globalSummary = await compressStoryNodes(textAfterPhaseCompress, 'global', apiKey, '')
       return `【全局总结】${globalSummary}`
     }
     
@@ -292,7 +303,8 @@ export async function smartAppendStoryNode(
   // 5. 如果节点没到 100 条，但用户手动贴了长篇大论导致字数超标，直接全局压缩
   if (text.length >= MAX_SETTING_CHARS * 0.9) {
     console.log('字数逼近上限，触发全局节点压缩')
-    const compressed = await compressStoryNodes(text, 'global', apiKey)
+    // 🌟 传递自定义API地址参数
+    const compressed = await compressStoryNodes(text, 'global', apiKey, '')
     return `【全局总结】${compressed}`
   }
 
@@ -309,9 +321,14 @@ export async function smartAppendStoryNode(
 export async function compressStoryNodes(
   content: string,
   mode: 'phase' | 'global',
-  apiKey: string
+  apiKey: string,
+  customApiUrl?: string
 ): Promise<string> {
-  const baseURL = getApiBase()
+  // 🌟 添加自定义API地址支持
+  let baseURL = getApiBase()
+  if (customApiUrl) {
+    baseURL = customApiUrl.replace(/\/$/, ''); // 去除末尾可能存在的斜杠
+  }
   
   if (baseURL.includes('your-api.com')) {
     return mode === 'phase' 
