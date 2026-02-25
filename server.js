@@ -284,5 +284,5 @@ app.get('/health', (req, res) => {
 
 // 启动服务器
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 AIBook 真实后端已允许局域网访问，端口: ${PORT}`);
+  console.log(`🚀 RealmCrafter 真实后端已允许局域网访问，端口: ${PORT}`);
 });

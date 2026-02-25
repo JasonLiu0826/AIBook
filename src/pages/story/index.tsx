@@ -130,7 +130,7 @@ ${'='.repeat(50)}
 
 ${'='.repeat(50)}
 
-📝 本故事由AIBook智能创作助手生成`  
+📝 本故事由RealmCrafter智能创作助手生成`  
   return header + content + footer
 }
 
@@ -156,7 +156,7 @@ ${ch?.content || ''}
     }
   });
   
-  md += `---\n\n*📝 本故事由AIBook智能创作助手生成*`;
+  md += `---\n\n*📝 本故事由RealmCrafter智能创作助手生成*`;
   return md;
 }
 
@@ -484,18 +484,17 @@ export default function StoryPage() {
   const handleExportImage = async () => {
     if (!chapters || chapters.length === 0) return;
     setShowExportSheet(false);
-    Taro.showLoading({ title: '正在绘制卡片...', mask: true });
+    // 🌟 微信最新规则适配：静默获取本地缓存的笔名
+    let userName = Taro.getStorageSync('aibook_author_name');
 
-    // 🌟 尝试获取微信用户昵称（静默获取，若无权限则用默认值）
-    let userName = '微信创作者';
-    try {
-      const userInfoRes = await Taro.getUserInfo();
-      if (userInfoRes?.userInfo?.nickName) {
-        userName = userInfoRes.userInfo.nickName;
-      }
-    } catch (e) {
-      console.log('未授权获取用户昵称，使用默认值');
+    // 如果本地没有缓存过笔名，则使用默认值
+    if (!userName) {
+      userName = '匿名创作者';
+      // 永久缓存在本地，下次导出直接使用
+      Taro.setStorageSync('aibook_author_name', userName); 
     }
+
+    Taro.showLoading({ title: '正在绘制卡片...', mask: true });
 
     try {
       // 1. 获取 Canvas 2D 对象
@@ -530,7 +529,7 @@ export default function StoryPage() {
           // 标题计算
           ctx.font = 'bold 50px sans-serif';
           // 如果没有名字，给个兜底
-          const titleText = currentStoryTitle || 'AIBook 互动小说';
+          const titleText = currentStoryTitle || 'RealmCrafter 互动小说';
           currentY += measureTextHeight(ctx, titleText, contentWidth, 65);
           
           // 日期与标签计算
@@ -552,7 +551,7 @@ export default function StoryPage() {
           currentY += 80; // 留白
           currentY += 30; // THE END
           currentY += 40; // 留白
-          currentY += 30; // 微信名 + AIBook
+          currentY += 30; // 微信名 + RealmCrafter
           currentY += 20; // 留白
           currentY += 24; // 下载 App 提示
           currentY += 60; // 底部最终留白
@@ -584,7 +583,7 @@ export default function StoryPage() {
           ctx.fillStyle = '#888888';
           ctx.font = '28px sans-serif';
           const timestamp = new Date().toLocaleString('zh-CN');
-          ctx.fillText(`${timestamp}  |  📝 AIBook 智能创作`, padding, drawY + 28);
+          ctx.fillText(`${timestamp}  |  📝 RealmCrafter 智能创作`, padding, drawY + 28);
           drawY += 50;
 
           // 画分割线
@@ -614,7 +613,7 @@ export default function StoryPage() {
           // 用户名 + 小程序名
           ctx.fillStyle = '#666666';
           ctx.font = '26px sans-serif';
-          ctx.fillText(`创作者：${userName} · AIBook`, canvasWidth / 2, drawY);
+          ctx.fillText(`创作者：${userName} · RealmCrafter`, canvasWidth / 2, drawY);
           drawY += 35;
 
           // 引导下载
@@ -708,9 +707,9 @@ export default function StoryPage() {
           <View className="empty">
             <Text className="empty-icon">✨</Text>
             <Text className="empty-title">开启您的创作之旅</Text>
-            <Text className="empty-desc">基于您精心设定的世界观和人物，AI将为您编织独一无二的互动故事。点击下方按钮开始创作吧！</Text>
+            <Text className="empty-desc">每一个选择都会创造一个新的现实，请仔细走好每一步</Text>
             <Button className="btn-start" disabled={generating} onClick={onStart}>
-              {generating ? <><View className="loading-spinner"></View>生成中…</> : '🚀 开始第一章'}
+              {generating ? <><View className="loading-spinner"></View>生成中…</> : '🚀 世界的命运由此开启'}
             </Button>
           </View>
         )}
@@ -728,7 +727,7 @@ export default function StoryPage() {
               ) : (
                 isLast && ch?.branches?.length > 0 && !generating && (
                   <View className="branches">
-                    <Text className="branches-label">选择下一步剧情发展：</Text>
+                    <Text className="branches-label">选择命运的分支：</Text>
                     {ch.branches.map((b, idx) => {
                       // 强制转换为对象类型，避免 typeof 误判，并提供明确的降级日志
                       const branchItem = b as BranchOption; 
@@ -774,7 +773,7 @@ export default function StoryPage() {
             <>
               <Input
                 className="custom-input"
-                placeholder="自定义下一步剧情..."
+                placeholder="命运由你书写..."
                 value={customBranch}
                 onInput={(e) => setCustomBranch(e.detail.value)}
                 maxlength={100}

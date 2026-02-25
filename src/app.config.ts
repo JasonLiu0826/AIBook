@@ -12,7 +12,7 @@ export default defineAppConfig({
   window: {
     backgroundTextStyle: 'light',
     navigationBarBackgroundColor: '#1a1a2e',
-    navigationBarTitleText: 'AI互动小说',
+    navigationBarTitleText: 'RealmCrafter',
     navigationBarTextStyle: 'white'
   },
   // 权限配置
