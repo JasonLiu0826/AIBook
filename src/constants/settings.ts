@@ -39,3 +39,14 @@ export const MAX_SETTING_CHARS = 10000
  * 💡 修改点 2：将 10KB 放宽至 20KB (20 * 1024 = 20480 Bytes)
  */
 export const MAX_MD_FILE_BYTES = 20480
+
+/**
+ * 预设模型配置
+ * 用户选择后自动填充Base URL，只需填写API Key
+ */
+export const PRESET_MODELS = [
+  { label: 'DeepSeek (性价比首选)', baseURL: 'https://api.deepseek.com/v1', defaultModel: 'deepseek-chat', tutorialUrl: 'https://platform.deepseek.com/' },
+  { label: 'Kimi / 月之暗面 (长文本强)', baseURL: 'https://api.moonshot.cn/v1', defaultModel: 'moonshot-v1-32k', tutorialUrl: 'https://platform.moonshot.cn/' },
+  { label: '智谱清言 (国内稳定)', baseURL: 'https://open.bigmodel.cn/api/paas/v4', defaultModel: 'glm-4', tutorialUrl: 'https://platform.zhipu.ai/' },
+  { label: '自定义 (高阶用户)', baseURL: '', defaultModel: '' }
+];

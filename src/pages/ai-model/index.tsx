@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, Picker, Input, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useUserConfig } from '@/store/userConfig'
+import { PRESET_MODELS } from '@/constants/settings'
 import './index.scss'
 
 interface AIModelConfig {
@@ -19,18 +20,27 @@ export default function AIModelPage() {
   })
   const [saving, setSaving] = useState(false)
 
-  const providerOptions = [
-    { label: 'DeepSeek大模型', value: 'deepseek' },
-    { label: '自定义API', value: 'custom' }
-  ]
-
-  const handleProviderChange = (e: any) => {
-    const selectedIndex = e.detail.value
-    const selectedProvider = providerOptions[selectedIndex].value as 'deepseek' | 'custom'
+  const handleModelChange = (e: any) => {
+    const selectedIndex = e.detail.value;
+    const selectedModel = PRESET_MODELS[selectedIndex];
+    
+    // 根据选择的模型设置provider
+    let newProvider: 'deepseek' | 'custom';
+    if (selectedModel.label === 'DeepSeek (性价比首选)') {
+      newProvider = 'deepseek';
+    } else if (selectedModel.label === 'Kimi / 月之暗面 (长文本强)' || 
+             selectedModel.label === '智谱清言 (国内稳定)') {
+      newProvider = 'custom';
+    } else {
+      // 自定义选项
+      newProvider = 'custom';
+    }
+    
     setLocalConfig(prev => ({
       ...prev,
-      provider: selectedProvider
-    }))
+      provider: newProvider,
+      customApiUrl: selectedModel.baseURL
+    }));
   }
 
   const handleSave = async () => {
@@ -90,28 +100,40 @@ export default function AIModelPage() {
   }
 
   const getProviderInfo = () => {
-    switch (localConfig.provider) {
-      case 'deepseek':
-        return {
-          title: 'DeepSeek大模型',
-          desc: '使用DeepSeek提供的AI大模型服务',
-          showApiKey: true,
-          showCustomUrl: false
-        }
-      case 'custom':
-        return {
-          title: '自定义API',
-          desc: '连接您自己的AI服务接口，支持硅基流动、Kimi、GLM等兼容OpenAI格式的大模型平台',
-          showApiKey: true,
-          showCustomUrl: true
-        }
-      default:
-        return {
-          title: '',
-          desc: '',
-          showApiKey: false,
-          showCustomUrl: false
-        }
+    // 精确匹配：按预设模型顺序查找
+    let currentModel: typeof PRESET_MODELS[0] | undefined;
+    
+    // 1. 先检查自定义选项
+    if (localConfig.provider === 'custom' && (!localConfig.customApiUrl || localConfig.customApiUrl === '')) {
+      currentModel = PRESET_MODELS.find(m => m.label === '自定义 (高阶用户)');
+    }
+    // 2. 再检查DeepSeek
+    else if (localConfig.provider === 'deepseek' && localConfig.customApiUrl === 'https://api.deepseek.com/v1') {
+      currentModel = PRESET_MODELS.find(m => m.label === 'DeepSeek (性价比首选)');
+    }
+    // 3. 检查Kimi
+    else if (localConfig.provider === 'custom' && localConfig.customApiUrl === 'https://api.moonshot.cn/v1') {
+      currentModel = PRESET_MODELS.find(m => m.label === 'Kimi / 月之暗面 (长文本强)');
+    }
+    // 4. 检查智谱清言
+    else if (localConfig.provider === 'custom' && localConfig.customApiUrl === 'https://open.bigmodel.cn/api/paas/v4') {
+      currentModel = PRESET_MODELS.find(m => m.label === '智谱清言 (国内稳定)');
+    }
+    
+    if (currentModel && currentModel.label !== '自定义 (高阶用户)') {
+      return {
+        title: currentModel.label,
+        desc: `使用${currentModel.label.split(' ')[0]}提供的AI大模型服务`,
+        showApiKey: true,
+        showCustomUrl: false
+      }
+    } else {
+      return {
+        title: '自定义API',
+        desc: '连接您自己的AI服务接口，支持任何兼容OpenAI格式的大模型平台',
+        showApiKey: true,
+        showCustomUrl: true
+      }
     }
   }
 
@@ -128,12 +150,33 @@ export default function AIModelPage() {
         <Text className="section-title">选择AI服务商</Text>
         <Picker
           mode="selector"
-          range={providerOptions.map(opt => opt.label)}
-          onChange={handleProviderChange}
+          range={PRESET_MODELS.map(model => model.label)}
+          onChange={handleModelChange}
         >
           <View className="picker-item">
             <Text className="picker-label">
-              {providerOptions.find(opt => opt.value === localConfig.provider)?.label}
+              {(() => {
+                // 优先匹配当前配置
+                const matchedModel = PRESET_MODELS.find(model => {
+                  if (model.label === '自定义 (高阶用户)') {
+                    return localConfig.provider === 'custom' && (!localConfig.customApiUrl || localConfig.customApiUrl === '');
+                  }
+                  return model.baseURL === localConfig.customApiUrl;
+                });
+                
+                if (matchedModel) {
+                  return matchedModel.label;
+                }
+                
+                // 如果没有匹配到，根据provider显示默认选项
+                if (localConfig.provider === 'deepseek') {
+                  return 'DeepSeek (性价比首选)';
+                } else if (localConfig.provider === 'custom') {
+                  return '自定义 (高阶用户)';
+                }
+                
+                return '请选择模型';
+              })()}
             </Text>
             <Text className="picker-arrow">›</Text>
           </View>
@@ -143,6 +186,12 @@ export default function AIModelPage() {
       <View className="info-card">
         <Text className="info-title">{providerInfo.title}</Text>
         <Text className="info-desc">{providerInfo.desc}</Text>
+      </View>
+
+      {/* 隐私保护声明 */}
+      <View className="privacy-notice">
+        <Text className="privacy-icon">🔒</Text>
+        <Text className="privacy-text">隐私保护：API密钥和小说数据均加密存储于本地，AI请求直接发往模型厂商，不经过开发者服务器。</Text>
       </View>
 
       {providerInfo.showApiKey && (
@@ -204,10 +253,9 @@ export default function AIModelPage() {
 
       <View className="tips">
         <Text className="tips-title">💡 使用提示</Text>
-        <Text className="tips-item"> DeepSeek：提供高质量的中文写作能力</Text>
-        <Text className="tips-item"> 自定义API：支持硅基流动、Kimi、GLM等兼容OpenAI格式的大模型平台</Text>
-        <Text className="tips-item"> API密钥会加密存储在本地</Text>
-        <Text className="tips-item"> 更换模型后建议重新开始新故事</Text>
+        <Text className="tips-item"> 自定义API：支持任何兼容OpenAI格式的大模型平台</Text>
+        <Text className="tips-item"> API密钥会加密存储在本地，不会上传，无需担心泄露问题</Text>
+        <Text className="tips-item"> 各模型理解能力存在差异，更换模型后建议重新开始新故事</Text>
       </View>
     </View>
   )
